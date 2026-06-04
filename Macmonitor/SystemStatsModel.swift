@@ -14,6 +14,69 @@ struct ProcInfo: Identifiable {
     let mem:  Int64
 }
 
+struct DiskProcInfo: Identifiable {
+    let id = UUID()
+    let pid: Int
+    let name: String
+    let readBps: Int64
+    let writeBps: Int64
+}
+
+struct NetworkProcInfo: Identifiable {
+    let id = UUID()
+    let pid: Int
+    let name: String
+    let downBps: Int64
+    let upBps: Int64
+}
+
+struct TokenTrackerStatus {
+    let todayTokens: Double
+    let todayCost: Double
+    let weekTokens: Double
+    let weekCost: Double
+    let monthTokens: Double
+    let monthCost: Double
+    let topModels: [TokenTrackerModel]
+    let limits: [TokenTrackerLimit]
+    let generatedAt: String?
+
+    var menuSummary: String {
+        if todayCost > 0 {
+            return "TOK \(Self.compactCount(todayTokens)) \(Self.compactUsd(todayCost))"
+        }
+        return "TOK \(Self.compactCount(todayTokens))"
+    }
+
+    static func compactCount(_ value: Double) -> String {
+        if value >= 1_000_000_000 { return String(format: "%.1fB", value / 1_000_000_000) }
+        if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
+        if value >= 1_000 { return String(format: "%.0fK", value / 1_000) }
+        return "\(Int(value))"
+    }
+
+    static func compactUsd(_ value: Double) -> String {
+        if value >= 1_000 { return String(format: "$%.1fk", value / 1_000) }
+        if value >= 10 { return String(format: "$%.0f", value) }
+        return String(format: "$%.2f", value)
+    }
+}
+
+struct TokenTrackerModel: Identifiable {
+    let id = UUID()
+    let name: String
+    let source: String
+    let tokens: Double
+    let sharePercent: Double
+}
+
+struct TokenTrackerLimit: Identifiable {
+    let id = UUID()
+    let label: String
+    let fraction: Double
+    let resetsAt: String?
+}
+
 // MARK: - Model
 
 class SystemStatsModel: ObservableObject {
@@ -91,6 +154,11 @@ class SystemStatsModel: ObservableObject {
     @Published var cpuDieHotspot: Double = 0
 
     @Published var topProcs: [ProcInfo] = []
+    @Published var topDiskProcs: [DiskProcInfo] = []
+    @Published var topNetworkProcs: [NetworkProcInfo] = []
+    @Published var weatherText: String = ""
+    @Published var tokenTrackerText: String = ""
+    @Published var tokenTrackerStatus: TokenTrackerStatus?
     @Published var nativeReady           = false
     @Published var helperMissing         = false
 
@@ -109,10 +177,16 @@ class SystemStatsModel: ObservableObject {
     private var batterySampleCountdown    = 0
     private var timer: Timer?
     private var diskTimer: Timer?          // independent timer — keeps ioreg off samplerQueue
+    private var networkProcessTimer: Timer?
+    private var weatherTimer: Timer?
+    private var tokenTrackerTimer: Timer?
     private let samplerQueue = DispatchQueue(label: "rybo.Macmonitor.sampler", qos: .utility)
     private let helperPath = "/Users/Shared/MacMonitor/macmonitor-helper"
     private let helperSudoersPath = "/etc/sudoers.d/macmonitor-helper"
     private var helperBootstrapInFlight = false
+    private var networkProcessInFlight = false
+    private var weatherInFlight = false
+    private var previousDiskProcessSamples: [Int: (read: Int64, write: Int64, sampledAt: Date)] = [:]
 
     // MARK: - Start
 
@@ -133,6 +207,21 @@ class SystemStatsModel: ObservableObject {
             self?.tickDisk()
         }
         tickDisk()   // seed immediately (async, doesn't block)
+
+        // Per-process network ranking uses nettop's delta sampler, which takes about 1 s.
+        // Keep it off samplerQueue so CPU/memory updates stay responsive.
+        networkProcessTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: true) { [weak self] _ in
+            self?.tickNetworkProcesses()
+        }
+        tickNetworkProcesses()
+
+        weatherTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
+            self?.refreshWeather()
+        }
+        tokenTrackerTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            self?.refreshTokenTracker()
+        }
+        refreshOptionalMenuBarMetrics()
 
         // Static system info (includes one ioreg call for GPU core count).
         // Run on a background queue so it doesn't block samplerQueue either.
@@ -198,6 +287,11 @@ class SystemStatsModel: ObservableObject {
         }
     }
 
+    func refreshOptionalMenuBarMetrics() {
+        refreshWeather()
+        refreshTokenTracker()
+    }
+
     // MARK: - Disk I/O (independent timer — never blocks samplerQueue)
 
     // Called from diskTimer on the main thread every 6 s.
@@ -217,6 +311,7 @@ class SystemStatsModel: ObservableObject {
         DispatchQueue.global(qos: .background).async { [weak self] in
             guard let self = self else { return }
             let (readBytes, writeBytes) = self.diskCumulative()
+            let diskProcs = self.sampleDiskProcessRanks()
             // First call seeds baseline — show 0 so we don't display boot-time totals.
             let readKBs  = seeded ? max(0, Double(readBytes  - prevRead)  / 6.0 / 1024.0) : 0
             let writeKBs = seeded ? max(0, Double(writeBytes - prevWrite) / 6.0 / 1024.0) : 0
@@ -226,7 +321,23 @@ class SystemStatsModel: ObservableObject {
                 self.prevDiskWriteBytes = writeBytes
                 self.diskReadKBs        = readKBs
                 self.diskWriteKBs       = writeKBs
+                self.topDiskProcs       = diskProcs
                 self.diskInFlight       = false
+            }
+        }
+    }
+
+    private func tickNetworkProcesses() {
+        guard !networkProcessInFlight else { return }
+        networkProcessInFlight = true
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let procs = self.sampleNetworkProcessRanks()
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.topNetworkProcs = procs
+                self.networkProcessInFlight = false
             }
         }
     }
@@ -329,6 +440,299 @@ class SystemStatsModel: ObservableObject {
         }
 
         return (read, write)
+    }
+
+    // MARK: - Per-process I/O rankings
+
+    private func sampleDiskProcessRanks() -> [DiskProcInfo] {
+        let now = Date()
+        let current = diskProcessSamples(sampledAt: now)
+        defer { previousDiskProcessSamples = current }
+
+        guard !previousDiskProcessSamples.isEmpty else { return [] }
+
+        var rows: [DiskProcInfo] = []
+        for (pid, sample) in current {
+            guard let previous = previousDiskProcessSamples[pid] else { continue }
+            let dt = max(sample.sampledAt.timeIntervalSince(previous.sampledAt), 0.001)
+            let readBps = Int64(max(0, Double(sample.read - previous.read) / dt))
+            let writeBps = Int64(max(0, Double(sample.write - previous.write) / dt))
+            guard readBps + writeBps > 0 else { continue }
+            guard let name = processName(pid: pid), shouldShowProcess(name) else { continue }
+
+            rows.append(DiskProcInfo(
+                pid: pid,
+                name: name,
+                readBps: readBps,
+                writeBps: writeBps
+            ))
+        }
+
+        return Array(rows.sorted { ($0.readBps + $0.writeBps) > ($1.readBps + $1.writeBps) }.prefix(5))
+    }
+
+    private func diskProcessSamples(sampledAt: Date) -> [Int: (read: Int64, write: Int64, sampledAt: Date)] {
+        let pidCount = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0) / Int32(MemoryLayout<pid_t>.size)
+        guard pidCount > 0 else { return [:] }
+
+        var pids = [pid_t](repeating: 0, count: Int(pidCount))
+        let bytes = proc_listpids(
+            UInt32(PROC_ALL_PIDS),
+            0,
+            &pids,
+            Int32(pids.count * MemoryLayout<pid_t>.size)
+        )
+        let count = max(0, Int(bytes) / MemoryLayout<pid_t>.size)
+        var samples: [Int: (read: Int64, write: Int64, sampledAt: Date)] = [:]
+
+        for pid in pids.prefix(count) where pid > 0 {
+            var info = rusage_info_v4()
+            let result = withUnsafeMutableBytes(of: &info) { rawBuffer -> Int32 in
+                guard let base = rawBuffer.baseAddress else { return -1 }
+                return proc_pid_rusage(
+                    pid,
+                    RUSAGE_INFO_V4,
+                    base.assumingMemoryBound(to: rusage_info_t?.self)
+                )
+            }
+            guard result == 0 else { continue }
+            samples[Int(pid)] = (
+                read: Int64(clamping: info.ri_diskio_bytesread),
+                write: Int64(clamping: info.ri_diskio_byteswritten),
+                sampledAt: sampledAt
+            )
+        }
+
+        return samples
+    }
+
+    private func sampleNetworkProcessRanks() -> [NetworkProcInfo] {
+        // -d makes the second sample a one-second delta; the first sample is cumulative
+        // and is discarded by keeping only rows after the final CSV header.
+        let output = shell("/usr/bin/nettop", [
+            "-P", "-L", "2", "-d", "-x", "-J", "bytes_in,bytes_out", "-s", "1"
+        ])
+        var rows: [NetworkProcInfo] = []
+
+        for line in output.split(separator: "\n") {
+            let columns = line.split(separator: ",", omittingEmptySubsequences: false)
+            guard columns.count >= 3 else { continue }
+            if columns[0].isEmpty {
+                rows.removeAll()
+                continue
+            }
+
+            let processID = String(columns[0])
+            guard let dot = processID.lastIndex(of: "."),
+                  let pid = Int(processID[processID.index(after: dot)...]) else { continue }
+
+            let name = String(processID[..<dot])
+            guard shouldShowProcess(name) else { continue }
+
+            let down = Int64(columns[1].trimmingCharacters(in: .whitespaces)) ?? 0
+            let up = Int64(columns[2].trimmingCharacters(in: .whitespaces)) ?? 0
+            guard down + up > 0 else { continue }
+
+            rows.append(NetworkProcInfo(
+                pid: pid,
+                name: name,
+                downBps: down,
+                upBps: up
+            ))
+        }
+
+        return Array(rows.sorted { ($0.downBps + $0.upBps) > ($1.downBps + $1.upBps) }.prefix(5))
+    }
+
+    private func processName(pid: Int) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(2 * MAXCOMLEN))
+        let length = proc_name(Int32(pid), &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(cString: buffer)
+    }
+
+    private func shouldShowProcess(_ name: String) -> Bool {
+        let lowered = name.lowercased()
+        return name != "kernel_task" && !lowered.contains("macmonitor")
+    }
+
+    // MARK: - Optional menu bar sources
+
+    private func refreshWeather() {
+        let location = UserDefaults.standard.string(forKey: "weatherLocation")?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard MenuBarLayoutStore.isVisible(.weather), !location.isEmpty else {
+            DispatchQueue.main.async { self.weatherText = "" }
+            return
+        }
+        guard !weatherInFlight else { return }
+        weatherInFlight = true
+
+        var geocode = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")
+        geocode?.queryItems = [
+            URLQueryItem(name: "name", value: location),
+            URLQueryItem(name: "count", value: "1"),
+            URLQueryItem(name: "language", value: "en"),
+            URLQueryItem(name: "format", value: "json")
+        ]
+        guard let geocodeURL = geocode?.url else {
+            finishWeather("")
+            return
+        }
+
+        URLSession.shared.dataTask(with: geocodeURL) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            guard let data = data,
+                  let place = try? JSONDecoder().decode(OpenMeteoGeocode.self, from: data).results?.first
+            else {
+                self.finishWeather("")
+                return
+            }
+
+            var forecast = URLComponents(string: "https://api.open-meteo.com/v1/forecast")
+            forecast?.queryItems = [
+                URLQueryItem(name: "latitude", value: "\(place.latitude)"),
+                URLQueryItem(name: "longitude", value: "\(place.longitude)"),
+                URLQueryItem(name: "current", value: "temperature_2m,weather_code"),
+                URLQueryItem(name: "temperature_unit", value: "celsius")
+            ]
+            guard let forecastURL = forecast?.url else {
+                self.finishWeather("")
+                return
+            }
+
+            URLSession.shared.dataTask(with: forecastURL) { [weak self] data, _, _ in
+                guard let self = self else { return }
+                guard let data = data,
+                      let current = try? JSONDecoder().decode(OpenMeteoForecast.self, from: data).current
+                else {
+                    self.finishWeather("")
+                    return
+                }
+                let temp = Int(current.temperature.rounded())
+                self.finishWeather("WX \(temp)° \(Self.weatherLabel(for: current.weatherCode))")
+            }.resume()
+        }.resume()
+    }
+
+    private func finishWeather(_ text: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.weatherText = text
+            self?.weatherInFlight = false
+        }
+    }
+
+    private struct OpenMeteoGeocode: Decodable {
+        let results: [Place]?
+        struct Place: Decodable {
+            let latitude: Double
+            let longitude: Double
+        }
+    }
+
+    private struct OpenMeteoForecast: Decodable {
+        let current: Current?
+        struct Current: Decodable {
+            let temperature: Double
+            let weatherCode: Int
+            enum CodingKeys: String, CodingKey {
+                case temperature = "temperature_2m"
+                case weatherCode = "weather_code"
+            }
+        }
+    }
+
+    private static func weatherLabel(for code: Int) -> String {
+        switch code {
+        case 0: return "Clear"
+        case 1...3: return "Cloudy"
+        case 45, 48: return "Fog"
+        case 51...67, 80...82: return "Rain"
+        case 71...77, 85...86: return "Snow"
+        case 95...99: return "Storm"
+        default: return "Weather"
+        }
+    }
+
+    private func refreshTokenTracker() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let status = self.tokenTrackerSnapshot()
+            DispatchQueue.main.async { [weak self] in
+                self?.tokenTrackerStatus = status
+                self?.tokenTrackerText = status?.menuSummary ?? ""
+            }
+        }
+    }
+
+    private func tokenTrackerSnapshot() -> TokenTrackerStatus? {
+        for path in tokenTrackerSnapshotPaths() {
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+                  let snapshot = try? JSONDecoder().decode(TokenTrackerSnapshot.self, from: data),
+                  let today = snapshot.today
+            else { continue }
+
+            return TokenTrackerStatus(
+                todayTokens: today.tokens ?? 0,
+                todayCost: today.costUsd ?? 0,
+                weekTokens: snapshot.last7d?.tokens ?? 0,
+                weekCost: snapshot.last7d?.costUsd ?? 0,
+                monthTokens: snapshot.last30d?.tokens ?? 0,
+                monthCost: snapshot.last30d?.costUsd ?? 0,
+                topModels: snapshot.topModels?.prefix(5).map {
+                    TokenTrackerModel(
+                        name: $0.name,
+                        source: $0.source ?? "",
+                        tokens: $0.tokens ?? 0,
+                        sharePercent: $0.sharePercent ?? 0
+                    )
+                } ?? [],
+                limits: snapshot.limits?.prefix(3).map {
+                    TokenTrackerLimit(
+                        label: $0.label,
+                        fraction: $0.fraction ?? 0,
+                        resetsAt: $0.resetsAt
+                    )
+                } ?? [],
+                generatedAt: snapshot.generatedAt
+            )
+        }
+        return nil
+    }
+
+    private func tokenTrackerSnapshotPaths() -> [String] {
+        let home = NSHomeDirectory()
+        return [
+            "\(home)/Library/Group Containers/group.com.tokentracker.bar/widget-snapshot.json",
+            "\(home)/Library/Application Support/TokenTrackerBar/widget-snapshot.json"
+        ]
+    }
+
+    private struct TokenTrackerSnapshot: Decodable {
+        let today: Today?
+        let last7d: Today?
+        let last30d: Today?
+        let topModels: [Model]?
+        let limits: [Limit]?
+        let generatedAt: String?
+
+        struct Today: Decodable {
+            let tokens: Double?
+            let costUsd: Double?
+        }
+
+        struct Model: Decodable {
+            let name: String
+            let source: String?
+            let tokens: Double?
+            let sharePercent: Double?
+        }
+
+        struct Limit: Decodable {
+            let label: String
+            let fraction: Double?
+            let resetsAt: String?
+        }
     }
 
     // MARK: - Battery (pmset + ioreg)

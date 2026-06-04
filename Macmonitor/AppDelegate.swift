@@ -3,6 +3,341 @@ import SwiftUI
 import Combine
 import ServiceManagement
 
+extension Notification.Name {
+    static let menuBarLayoutChanged = Notification.Name("menuBarLayoutChanged")
+}
+
+enum MenuBarMetric: String, CaseIterable, Identifiable {
+    case cpu
+    case memory
+    case network
+    case disk
+    case power
+    case battery
+    case weather
+    case tokenTracker
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cpu:          return "CPU"
+        case .memory:       return "Memory"
+        case .network:      return "Network"
+        case .disk:         return "Disk I/O"
+        case .power:        return "Power"
+        case .battery:      return "Battery"
+        case .weather:      return "Weather"
+        case .tokenTracker: return "Token Tracker"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .cpu:          return "CPU"
+        case .memory:       return "MEM"
+        case .network:      return "NET"
+        case .disk:         return "DSK"
+        case .power:        return "PWR"
+        case .battery:      return "BAT"
+        case .weather:      return "WX"
+        case .tokenTracker: return "TOK"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .cpu:          return "cpu"
+        case .memory:       return "memorychip"
+        case .network:      return "wifi"
+        case .disk:         return "internaldrive"
+        case .power:        return "bolt.fill"
+        case .battery:      return "battery.75percent"
+        case .weather:      return "cloud.sun"
+        case .tokenTracker: return "number.square"
+        }
+    }
+
+    var defaultVisible: Bool {
+        switch self {
+        case .cpu, .memory, .network, .disk:
+            return true
+        case .power, .battery, .weather, .tokenTracker:
+            return false
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .cpu:          return "Overall load and CPU temperature."
+        case .memory:       return "Current memory pressure."
+        case .network:      return "Download and upload throughput."
+        case .disk:         return "Read and write throughput."
+        case .power:        return "Total system power draw."
+        case .battery:      return "Battery percentage when available."
+        case .weather:      return "Optional Open-Meteo weather for your saved location."
+        case .tokenTracker: return "Optional local TokenTracker snapshot, if installed."
+        }
+    }
+
+    func titleFragment(model: SystemStatsModel) -> String? {
+        switch self {
+        case .cpu:
+            let temp = model.cpuTemp > 0 ? String(format: " %.0f°", model.cpuTemp) : ""
+            return "\(shortLabel) \(model.cpuUsage)%\(temp)"
+        case .memory:
+            return "\(shortLabel) \(model.memPct)%"
+        case .network:
+            return "\(shortLabel) ↓\(Self.formatRate(model.netInBps)) ↑\(Self.formatRate(model.netOutBps))"
+        case .disk:
+            let read = Int64(model.diskReadKBs * 1024)
+            let write = Int64(model.diskWriteKBs * 1024)
+            return "\(shortLabel) R\(Self.formatRate(read)) W\(Self.formatRate(write))"
+        case .power:
+            guard model.totalPower > 0 else { return nil }
+            return "\(shortLabel) \(String(format: "%.1fW", model.totalPower))"
+        case .battery:
+            guard model.batteryPct > 0 else { return nil }
+            return "\(shortLabel) \(model.batteryPct)%"
+        case .weather:
+            guard !model.weatherText.isEmpty else { return nil }
+            return model.weatherText
+        case .tokenTracker:
+            guard !model.tokenTrackerText.isEmpty else { return nil }
+            return model.tokenTrackerText
+        }
+    }
+
+    private static func formatRate(_ bytesPerSecond: Int64) -> String {
+        let value = Double(max(0, bytesPerSecond))
+        if value >= 1_048_576 { return String(format: "%.1fM/s", value / 1_048_576) }
+        if value >= 1_024 { return String(format: "%.0fK/s", value / 1_024) }
+        return "\(Int(value))B/s"
+    }
+}
+
+enum MenuBarLayoutStore {
+    private static let orderKey = "menuBarMetricOrder"
+    private static let visiblePrefix = "menuBarMetricVisible."
+
+    static func orderedMetrics() -> [MenuBarMetric] {
+        let saved = UserDefaults.standard.stringArray(forKey: orderKey) ?? []
+        var metrics = saved.compactMap(MenuBarMetric.init(rawValue:))
+        for metric in MenuBarMetric.allCases where !metrics.contains(metric) {
+            metrics.append(metric)
+        }
+        return metrics
+    }
+
+    static func visibleMetrics() -> [MenuBarMetric] {
+        orderedMetrics().filter { isVisible($0) }
+    }
+
+    static func isVisible(_ metric: MenuBarMetric) -> Bool {
+        let key = visiblePrefix + metric.rawValue
+        guard UserDefaults.standard.object(forKey: key) != nil else {
+            return metric.defaultVisible
+        }
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    static func setVisible(_ metric: MenuBarMetric, _ visible: Bool) {
+        UserDefaults.standard.set(visible, forKey: visiblePrefix + metric.rawValue)
+        notify()
+    }
+
+    static func move(_ metric: MenuBarMetric, direction: Int) {
+        var metrics = orderedMetrics()
+        guard let index = metrics.firstIndex(of: metric) else { return }
+        let target = index + direction
+        guard metrics.indices.contains(target) else { return }
+        metrics.swapAt(index, target)
+        UserDefaults.standard.set(metrics.map(\.rawValue), forKey: orderKey)
+        notify()
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: orderKey)
+        for metric in MenuBarMetric.allCases {
+            UserDefaults.standard.removeObject(forKey: visiblePrefix + metric.rawValue)
+        }
+        notify()
+    }
+
+    private static func notify() {
+        NotificationCenter.default.post(name: .menuBarLayoutChanged, object: nil)
+    }
+}
+
+enum ChartStyle: String, CaseIterable, Identifiable {
+    case glow
+    case flat
+    case outline
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .glow:    return "Glow"
+        case .flat:    return "Flat"
+        case .outline: return "Outline"
+        }
+    }
+}
+
+enum AppearanceColorRole: String, CaseIterable, Identifiable {
+    case background
+    case panel
+    case primaryText
+    case secondaryText
+    case separator
+    case cpu
+    case memory
+    case networkDown
+    case networkUp
+    case diskRead
+    case diskWrite
+    case power
+    case battery
+    case weather
+    case tokenTracker
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .background:   return "Background"
+        case .panel:        return "Panel"
+        case .primaryText:  return "Primary Text"
+        case .secondaryText:return "Muted Text"
+        case .separator:    return "Separator"
+        case .cpu:          return "CPU"
+        case .memory:       return "Memory"
+        case .networkDown:  return "Net Down"
+        case .networkUp:    return "Net Up"
+        case .diskRead:     return "Disk Read"
+        case .diskWrite:    return "Disk Write"
+        case .power:        return "Power"
+        case .battery:      return "Battery"
+        case .weather:      return "Weather"
+        case .tokenTracker: return "Token"
+        }
+    }
+
+    var defaultHex: String {
+        switch self {
+        case .background:   return "0E0E12"
+        case .panel:        return "1C1C1E"
+        case .primaryText:  return "FFFFFF"
+        case .secondaryText:return "888899"
+        case .separator:    return "FFFFFF"
+        case .cpu:          return "30D158"
+        case .memory:       return "0A84FF"
+        case .networkDown:  return "30D158"
+        case .networkUp:    return "FF9F0A"
+        case .diskRead:     return "64D2FF"
+        case .diskWrite:    return "FF9F0A"
+        case .power:        return "FFD60A"
+        case .battery:      return "30D158"
+        case .weather:      return "64D2FF"
+        case .tokenTracker: return "BF5AF2"
+        }
+    }
+}
+
+enum AppearancePreset: String, CaseIterable, Identifiable {
+    case system
+    case graphite
+    case neon
+    case field
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:   return "System"
+        case .graphite: return "Graphite"
+        case .neon:     return "Neon"
+        case .field:    return "Field"
+        }
+    }
+
+    var colors: [AppearanceColorRole: String] {
+        switch self {
+        case .system:
+            return Dictionary(uniqueKeysWithValues: AppearanceColorRole.allCases.map { ($0, $0.defaultHex) })
+        case .graphite:
+            return [
+                .background: "101012", .panel: "1B1B1F", .primaryText: "F4F4F5",
+                .secondaryText: "A1A1AA", .separator: "D4D4D8",
+                .cpu: "A1A1AA", .memory: "D4D4D8", .networkDown: "86EFAC", .networkUp: "FDE68A",
+                .diskRead: "BAE6FD", .diskWrite: "FDBA74", .power: "FACC15", .battery: "A7F3D0",
+                .weather: "93C5FD", .tokenTracker: "C4B5FD"
+            ]
+        case .neon:
+            return [
+                .background: "07070A", .panel: "141018", .primaryText: "FFFFFF",
+                .secondaryText: "B7A8FF", .separator: "45E3FF",
+                .cpu: "39FF88", .memory: "00D1FF", .networkDown: "00FFA3", .networkUp: "FFB000",
+                .diskRead: "45E3FF", .diskWrite: "FF6B00", .power: "F8FF00", .battery: "50FF6C",
+                .weather: "7DD3FC", .tokenTracker: "D946EF"
+            ]
+        case .field:
+            return [
+                .background: "0B1110", .panel: "14201D", .primaryText: "F8FAFC",
+                .secondaryText: "94A3B8", .separator: "2DD4BF",
+                .cpu: "2DD4BF", .memory: "60A5FA", .networkDown: "22C55E", .networkUp: "F59E0B",
+                .diskRead: "38BDF8", .diskWrite: "FB923C", .power: "EAB308", .battery: "84CC16",
+                .weather: "0EA5E9", .tokenTracker: "A78BFA"
+            ]
+        }
+    }
+}
+
+extension Notification.Name {
+    static let appearanceChanged = Notification.Name("appearanceChanged")
+}
+
+enum AppearanceStore {
+    private static let colorPrefix = "appearanceColor."
+    private static let chartStyleKey = "chartStyle"
+
+    static let swatches = [
+        "30D158", "0A84FF", "64D2FF", "BF5AF2", "FF9F0A",
+        "FFD60A", "FF453A", "F472B6", "A1A1AA", "FFFFFF"
+    ]
+
+    static func hex(for role: AppearanceColorRole) -> String {
+        UserDefaults.standard.string(forKey: colorPrefix + role.rawValue) ?? role.defaultHex
+    }
+
+    static func setHex(_ hex: String, for role: AppearanceColorRole) {
+        UserDefaults.standard.set(hex, forKey: colorPrefix + role.rawValue)
+        notify()
+    }
+
+    static func apply(_ preset: AppearancePreset) {
+        for (role, hex) in preset.colors {
+            UserDefaults.standard.set(hex, forKey: colorPrefix + role.rawValue)
+        }
+        notify()
+    }
+
+    static func chartStyle() -> ChartStyle {
+        let raw = UserDefaults.standard.string(forKey: chartStyleKey) ?? ChartStyle.glow.rawValue
+        return ChartStyle(rawValue: raw) ?? .glow
+    }
+
+    static func setChartStyle(_ style: ChartStyle) {
+        UserDefaults.standard.set(style.rawValue, forKey: chartStyleKey)
+        notify()
+    }
+
+    private static func notify() {
+        NotificationCenter.default.post(name: .appearanceChanged, object: nil)
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     var statusItem: NSStatusItem?
@@ -20,11 +355,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         model.startMonitoring()
 
-        // Drive the label from published model values — fires immediately on change
-        Publishers.CombineLatest3(model.$cpuUsage, model.$memPct, model.$cpuTemp)
+        // Drive the label from published model values — fires immediately on change.
+        // Keep disk/network in the same menu-bar summary so heavy I/O is visible
+        // without opening the dashboard.
+        model.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] cpu, mem, temp in
-                self?.updateLabel(cpu: cpu, mem: mem, temp: temp)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.updateLabel()
+                }
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .menuBarLayoutChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.model.refreshOptionalMenuBarMetrics()
+                self?.updateLabel()
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .appearanceChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateLabel()
             }
             .store(in: &cancellables)
 
@@ -65,12 +417,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func updateLabel(cpu: Int, mem: Int, temp: Double) {
+    private func updateLabel() {
         guard let btn = statusItem?.button else { return }
+        let cpu = model.cpuUsage
+        let mem = model.memPct
         let dot = cpu >= 85 || mem >= 85 ? "🔴"
                 : cpu >= 60 || mem >= 60 ? "🟡" : "🟢"
-        let tempStr = temp > 0 ? String(format: " %.0f°", temp) : ""
-        btn.title = "\(dot) CPU \(cpu)%\(tempStr)  MEM \(mem)%"
+        let fragments = MenuBarLayoutStore.visibleMetrics().compactMap {
+            $0.titleFragment(model: model)
+        }
+        btn.title = ([dot] + (fragments.isEmpty ? ["MacMonitor"] : fragments)).joined(separator: "  ")
     }
 
     // MARK: - Click handling
@@ -134,7 +490,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openSettings() {
         let win = NSWindow(
-            contentRect:  NSRect(x: 0, y: 0, width: 320, height: 280),
+            contentRect:  NSRect(x: 0, y: 0, width: 380, height: 560),
             styleMask:    [.titled, .closable, .fullSizeContentView],
             backing:      .buffered,
             defer:        false

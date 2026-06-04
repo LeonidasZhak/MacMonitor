@@ -83,15 +83,22 @@ MacMonitor 2.0 reads **all hardware data directly from Apple's kernel interfaces
 
 ## Features
 
-### Menu bar indicator
+### Configurable menu bar indicator
 
-Updates every 2 seconds. One glance tells you if everything is fine.
+Updates every 2 seconds. One glance tells you if everything is fine. Open
+Settings to choose which metrics appear in the menu bar and arrange them in the
+order you prefer.
 
 ```
-● CPU 12%  MEM 47%    →  green dot  — all clear
-● CPU 62%  MEM 71%    →  yellow dot — moderate load
-● CPU 91%  MEM 87%    →  red dot    — heavy load, open dashboard
+● CPU 12%  MEM 47%  NET ↓24K/s ↑3K/s  DSK R0B/s W0B/s    →  green dot  — all clear
+● CPU 62%  MEM 71%  NET ↓1.2M/s ↑80K/s  DSK R4K/s W2M/s  →  yellow dot — moderate load
+● CPU 91%  MEM 87%  NET ↓8M/s ↑4M/s  DSK R60M/s W1M/s    →  red dot    — heavy load, open dashboard
 ```
+
+All eight menu bar modules can be shown, hidden, and reordered: CPU, memory,
+network, disk, power, battery, weather, and TokenTracker. Optional modules
+include Open-Meteo weather for a saved location and a local TokenTracker summary
+when TokenTrackerBar is installed.
 
 ### Full dashboard (click to open)
 
@@ -103,18 +110,26 @@ Updates every 2 seconds. One glance tells you if everything is fine.
 | **Fan** | Live RPM — hidden automatically on fanless models |
 | **Memory** | Used / total · DRAM bandwidth (read + write GB/s) · swap |
 | **Battery** | Charge % · status · charge rate · adapter watts · cycles · health · mAh · cell temp |
-| **Network** | Download / upload (auto-scaled B / KB / MB per second) |
-| **Disk I/O** | Read / write throughput (auto-scaled) |
+| **Network** | Download / upload throughput plus top app download/upload ranking |
+| **Disk I/O** | Read / write throughput plus top app read/write ranking |
 | **Power rails** | CPU · GPU · ANE · DRAM · System (PSTR) · Total |
 | **Processes** | Top 8 CPU consumers — name, CPU %, memory |
+| **Token Tracker** | Local TokenTrackerBar totals, cost, top models, and usage limits |
+| **Companion** | Optional lightweight dashboard companion |
 | **Optimize** | Purge disk cache + quit heavy apps |
+
+### Appearance
+
+Settings includes color presets, per-role color pickers, quick swatches, and
+chart style controls. Metric colors, panel colors, text colors, separators, and
+bar rendering can be customized without editing code.
 
 ### Desktop widget
 
 Runs completely standalone — no background process required.
 
-- **Small** — CPU, GPU, Memory bars + temperatures
-- **Medium** — All bars + network speed + power draw
+- **Small** — CPU and memory bars, network speed, disk I/O, thermal state
+- **Medium** — CPU and memory bars, network speed, disk I/O, top network app, top disk app
 
 Works on macOS Sonoma and Sequoia desktop, Notification Centre, and Stage Manager.
 
@@ -142,7 +157,7 @@ This is the same data that TG Pro, iStatMenus, and macOS's own thermal managemen
 
 ## Data Sources
 
-MacMonitor pulls from four native macOS kernel interfaces — no third-party tools required:
+MacMonitor pulls from native macOS interfaces and bundled command-line tools — no third-party tools required:
 
 | Source | Data | Requires privileged helper? |
 |--------|------|-----------------------------|
@@ -150,6 +165,10 @@ MacMonitor pulls from four native macOS kernel interfaces — no third-party too
 | **Mach kernel** — `vm_statistics64` | Memory used/free/compressed, swap | No |
 | **IOReport + SMC + IOHIDEventSystem** | GPU%, freq, CPU/GPU temps, die hotspot, fan RPM, ANE/DRAM/GPU power, DRAM bandwidth | Yes (one-time setup) |
 | **IOKit** — `pmset` / `ioreg` | Battery %, cycles, health, charge rate, adapter watts, cell temp | No |
+| **libproc** — `proc_pid_rusage` | Per-process disk read/write ranking | No |
+| **macOS tools** — `netstat` / `nettop` | Aggregate network speed and per-process upload/download ranking | No |
+| **Open-Meteo** | Optional weather module for a saved location | No |
+| **TokenTrackerBar snapshot** | Optional local token/cost summary from `widget-snapshot.json` | No |
 
 The **privileged helper** (`macmonitor-helper`) is a small compiled binary installed to `/Users/Shared/MacMonitor/`. It runs as root to access IOReport, which requires elevated privileges to sample power data. MacMonitor asks for admin approval once on first launch and never again.
 
