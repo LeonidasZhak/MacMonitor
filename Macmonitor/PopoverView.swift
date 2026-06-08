@@ -553,28 +553,19 @@ private struct CompanionSection: View {
     @AppStorage("enableCompanionCat") private var enableCompanionCat = true
     @AppStorage("companionCatMood") private var mood = 2
 
-    private var catFace: String {
-        switch mood % 4 {
-        case 0: return "=^.^="
-        case 1: return "(=^-ω-^=)"
-        case 2: return "(=^･ｪ･^=)"
-        default: return "(=^‥^=)"
-        }
-    }
-
     var body: some View {
         if enableCompanionCat {
             SectionBox(icon: "pawprint.fill", title: "Companion") {
                 HStack(spacing: 10) {
-                    Text(catFace)
-                        .font(.system(size: 18, weight: .medium, design: .monospaced))
-                        .foregroundColor(Color.theme(.weather))
-                        .frame(width: 110, alignment: .leading)
+                    PetSpriteView(mood: mood)
+                        .frame(width: 112, height: 36)
+                        .background(Color.white.opacity(0.035))
+                        .cornerRadius(6)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Menu bar companion")
+                        Text("Status bar companion")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(Color.theme(.primaryText))
-                        Text("Lives here while the dashboard is open.")
+                        Text("Lives in the menu bar and reacts when clicked.")
                             .font(.system(size: 10))
                             .foregroundColor(Color.theme(.secondaryText))
                     }
@@ -582,6 +573,55 @@ private struct CompanionSection: View {
                     Button("Pet") { mood += 1 }
                         .buttonStyle(.bordered)
                         .font(.system(size: 11, weight: .medium))
+                }
+            }
+        }
+    }
+}
+
+private struct PetSpriteView: View {
+    let mood: Int
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.45)) { context in
+            let tick = Int(context.date.timeIntervalSinceReferenceDate * 2)
+            Canvas { ctx, size in
+                let direction: CGFloat = tick % 12 < 6 ? 1 : -1
+                let x = 38 + CGFloat((tick % 6) * 5)
+                let y = size.height / 2 - 5
+                let pet = Path(roundedRect: CGRect(x: x - 12, y: y, width: 24, height: 13), cornerRadius: 7)
+                ctx.fill(pet, with: .color(Color.theme(.weather).opacity(0.85)))
+                let headX = x + direction * 13
+                let head = Path(roundedRect: CGRect(x: headX - 6, y: y - 3, width: 13, height: 12), cornerRadius: 5)
+                ctx.fill(head, with: .color(Color.theme(.weather)))
+
+                var ear = Path()
+                ear.move(to: CGPoint(x: headX - 5, y: y - 1))
+                ear.addLine(to: CGPoint(x: headX - 3, y: y - 7))
+                ear.addLine(to: CGPoint(x: headX - 1, y: y - 1))
+                ear.closeSubpath()
+                ctx.fill(ear, with: .color(Color.theme(.weather)))
+
+                var tail = Path()
+                tail.move(to: CGPoint(x: x - direction * 12, y: y + 5))
+                tail.addQuadCurve(to: CGPoint(x: x - direction * 22, y: y + CGFloat(tick % 2 == 0 ? 1 : 10)),
+                                  control: CGPoint(x: x - direction * 16, y: y + 13))
+                ctx.stroke(tail, with: .color(Color.theme(.weather).opacity(0.88)), lineWidth: 2)
+
+                let eyeOpen = tick % 19 != 0
+                if eyeOpen {
+                    ctx.fill(Path(ellipseIn: CGRect(x: headX + direction * 1, y: y + 1, width: 2.4, height: 2.4)),
+                             with: .color(Color.theme(.background).opacity(0.72)))
+                } else {
+                    var blink = Path()
+                    blink.move(to: CGPoint(x: headX + direction * 1, y: y + 2))
+                    blink.addLine(to: CGPoint(x: headX + direction * 5, y: y + 2))
+                    ctx.stroke(blink, with: .color(Color.theme(.background).opacity(0.72)), lineWidth: 1)
+                }
+
+                if mood % 4 == 0 {
+                    ctx.fill(Path(ellipseIn: CGRect(x: x + 22, y: y - 5, width: 3, height: 3)),
+                             with: .color(Color.theme(.power)))
                 }
             }
         }
@@ -634,56 +674,67 @@ struct SettingsSheet: View {
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Settings")
-                    .font(.system(size: 16, weight: .bold)).foregroundColor(Color.theme(.primaryText))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Menu Bar App", isOn: $enableMenuBar)
-                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                    Text("Live stats in your menu bar. Click to open the full dashboard.")
-                        .font(.system(size: 11)).foregroundColor(Color.theme(.secondaryText))
-                        .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Settings")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(Color.theme(.primaryText))
+                    Spacer()
+                    Button("Done") {
+                        isPresented = false
+                        onClose()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(hex: "0A84FF"))
+                    .font(.system(size: 12, weight: .semibold))
                 }
 
-                MenuBarLayoutEditor(metrics: $menuMetrics, weatherLocation: $weatherLocation)
-
-                AppearanceEditor()
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Open at Login", isOn: $openAtLogin)
-                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                        .onChange(of: openAtLogin) { enabled in
-                            if enabled {
-                                try? SMAppService.mainApp.register()
-                            } else {
-                                try? SMAppService.mainApp.unregister()
-                            }
+                SettingsCard(title: "General") {
+                    SettingsToggleRow(
+                        title: "Menu Bar App",
+                        subtitle: "Live stats in your menu bar. Click to open the dashboard.",
+                        isOn: $enableMenuBar
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        title: "Open at Login",
+                        subtitle: "Automatically start MacMonitor when you log in.",
+                        isOn: $openAtLogin
+                    )
+                    .onChange(of: openAtLogin) { enabled in
+                        if enabled {
+                            try? SMAppService.mainApp.register()
+                        } else {
+                            try? SMAppService.mainApp.unregister()
                         }
-                    Text("Automatically start MacMonitor when you log in.")
-                        .font(.system(size: 11)).foregroundColor(Color.theme(.secondaryText))
-                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        title: "Desktop Widget",
+                        subtitle: "Use macOS Edit Widgets to add the standalone widget.",
+                        isOn: $enableWidget
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        title: "Status Bar Pet",
+                        subtitle: "Keep a small animated companion next to the menu bar stats.",
+                        isOn: $enableCompanionCat
+                    )
+                    .onChange(of: enableCompanionCat) { _ in
+                        NotificationCenter.default.post(name: .companionSettingsChanged, object: nil)
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Desktop Widget", isOn: $enableWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                    Text("Right-click your desktop → Edit Widgets → find MacMonitor.")
-                        .font(.system(size: 11)).foregroundColor(Color.theme(.secondaryText))
-                        .fixedSize(horizontal: false, vertical: true)
+                SettingsCard(title: "Menu Bar Layout") {
+                    MenuBarLayoutEditor(metrics: $menuMetrics, weatherLocation: $weatherLocation)
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Dashboard Companion", isOn: $enableCompanionCat)
-                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                    Text("Show a small interactive companion in the dashboard popover.")
-                        .font(.system(size: 11)).foregroundColor(Color.theme(.secondaryText))
-                        .fixedSize(horizontal: false, vertical: true)
+                SettingsCard(title: "Appearance") {
+                    AppearanceEditor()
                 }
 
-                Divider().background(Color.white.opacity(0.1))
-
-                HStack(alignment: .center, spacing: 8) {
+                SettingsCard(title: "About") {
+                    HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("MacMonitor  v\(updater.currentVersion)")
                             .font(.system(size: 11, weight: .semibold)).foregroundColor(Color.theme(.primaryText))
@@ -717,19 +768,11 @@ struct SettingsSheet: View {
                     Group {
                         switch updater.updatePhase {
                         case .idle:
-                            HStack(spacing: 6) {
-                                if updater.updateAvailable {
-                                    Button("Update") { updater.startUpdate() }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(Color(hex: "FF9F0A"))
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                Button("Done") {
-                                    isPresented = false
-                                    onClose()
-                                }
+                            if updater.updateAvailable {
+                                Button("Update") { updater.startUpdate() }
                                     .buttonStyle(.borderedProminent)
-                                    .tint(Color(hex: "0A84FF"))
+                                    .tint(Color(hex: "FF9F0A"))
+                                    .font(.system(size: 12, weight: .semibold))
                             }
                         case .downloading:
                             VStack(alignment: .trailing, spacing: 3) {
@@ -756,12 +799,13 @@ struct SettingsSheet: View {
                                 .font(.system(size: 12))
                         }
                     }
+                    }
                 }
             }
-            .padding(22)
+            .padding(16)
             .id(appearanceRevision)
         }
-        .frame(width: 410, height: 600)
+        .frame(width: 430, height: 620)
         .background(Color.theme(.panel))
         .preferredColorScheme(.dark)
         .onAppear { menuMetrics = MenuBarLayoutStore.orderedMetrics() }
@@ -771,6 +815,64 @@ struct SettingsSheet: View {
         .onChange(of: weatherLocation) { _ in
             NotificationCenter.default.post(name: .menuBarLayoutChanged, object: nil)
         }
+    }
+}
+
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.theme(.secondaryText))
+                .textCase(.uppercase)
+                .tracking(0.5)
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+            .padding(10)
+            .background(Color.white.opacity(0.035))
+            .cornerRadius(7)
+        }
+    }
+}
+
+private struct SettingsToggleRow: View {
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color.theme(.primaryText))
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundColor(Color.theme(.secondaryText))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
+                .scaleEffect(0.82)
+                .frame(width: 42)
+        }
+        .frame(minHeight: 38)
+    }
+}
+
+private struct SettingsDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.theme(.separator).opacity(0.07))
+            .frame(height: 1)
+            .padding(.vertical, 7)
     }
 }
 
@@ -883,12 +985,20 @@ private struct MenuBarLayoutEditor: View {
     @Binding var weatherLocation: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Menu Bar Layout")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.theme(.primaryText))
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Text("Show")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Color.theme(.secondaryText))
+                    .frame(width: 40, alignment: .trailing)
+                Text("Metric")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Color.theme(.secondaryText))
                 Spacer()
+                Text("Label")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Color.theme(.secondaryText))
+                    .frame(width: 36)
                 Button("Reset") {
                     MenuBarLayoutStore.reset()
                     metrics = MenuBarLayoutStore.orderedMetrics()
@@ -898,7 +1008,7 @@ private struct MenuBarLayoutEditor: View {
                 .foregroundColor(Color(hex: "0A84FF"))
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 5) {
                 ForEach(metrics) { metric in
                     MenuBarMetricRow(
                         metric: metric,
@@ -911,14 +1021,14 @@ private struct MenuBarLayoutEditor: View {
                         TextField("City or place, e.g. Taipei", text: $weatherLocation)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 11))
-                            .padding(.leading, 28)
+                            .padding(.leading, 56)
                     }
 
                     if metric == .tokenTracker && MenuBarLayoutStore.isVisible(.tokenTracker) {
                         Text("Reads TokenTrackerBar widget-snapshot.json when present.")
                             .font(.system(size: 10))
                             .foregroundColor(Color.theme(.secondaryText))
-                            .padding(.leading, 28)
+                            .padding(.leading, 56)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -932,9 +1042,23 @@ private struct MenuBarMetricRow: View {
     let isFirst: Bool
     let isLast: Bool
     @Binding var metrics: [MenuBarMetric]
+    @State private var metricVisible = true
+    @State private var labelVisible = true
 
     var body: some View {
         HStack(spacing: 8) {
+            Toggle("", isOn: Binding(
+                get: { metricVisible },
+                set: { visible in
+                    metricVisible = visible
+                    MenuBarLayoutStore.setVisible(metric, visible)
+                    metrics = MenuBarLayoutStore.orderedMetrics()
+                }
+            ))
+            .labelsHidden()
+            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
+            .scaleEffect(0.72)
+            .frame(width: 40)
             Image(systemName: metric.systemImage)
                 .font(.system(size: 11))
                 .foregroundColor(Color.theme(.secondaryText))
@@ -950,28 +1074,20 @@ private struct MenuBarMetricRow: View {
             }
             Spacer()
             if MenuBarLayoutStore.canHideLabel(metric) {
-                Toggle("Label", isOn: Binding(
-                    get: { MenuBarLayoutStore.isLabelVisible(metric) },
-                    set: { visible in
-                        MenuBarLayoutStore.setLabelVisible(metric, visible)
-                        metrics = MenuBarLayoutStore.orderedMetrics()
-                    }
-                ))
-                .toggleStyle(.checkbox)
-                .font(.system(size: 10))
-                .foregroundColor(Color.theme(.secondaryText))
-                .disabled(!MenuBarLayoutStore.isVisible(metric))
-            }
-            Toggle("", isOn: Binding(
-                get: { MenuBarLayoutStore.isVisible(metric) },
-                set: { visible in
-                    MenuBarLayoutStore.setVisible(metric, visible)
+                MiniCheckButton(isOn: labelVisible, isEnabled: metricVisible) {
+                    guard metricVisible else { return }
+                    let next = !labelVisible
+                    labelVisible = next
+                    MenuBarLayoutStore.setLabelVisible(metric, next)
                     metrics = MenuBarLayoutStore.orderedMetrics()
                 }
-            ))
-            .labelsHidden()
-            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-            .scaleEffect(0.75)
+                .frame(width: 36)
+            } else {
+                Text("—")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.theme(.secondaryText).opacity(0.45))
+                    .frame(width: 36)
+            }
             HStack(spacing: 2) {
                 Button {
                     MenuBarLayoutStore.move(metric, direction: -1)
@@ -992,11 +1108,40 @@ private struct MenuBarMetricRow: View {
             .buttonStyle(.plain)
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(Color.theme(.secondaryText))
+            .frame(width: 28)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(MenuBarLayoutStore.isVisible(metric) ? 0.055 : 0.025))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(Color.white.opacity(metricVisible ? 0.055 : 0.025))
         .cornerRadius(6)
+        .onAppear {
+            metricVisible = MenuBarLayoutStore.isVisible(metric)
+            labelVisible = MenuBarLayoutStore.isLabelVisible(metric)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .menuBarLayoutChanged)) { _ in
+            metricVisible = MenuBarLayoutStore.isVisible(metric)
+            labelVisible = MenuBarLayoutStore.isLabelVisible(metric)
+        }
+    }
+}
+
+private struct MiniCheckButton: View {
+    let isOn: Bool
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isOn ? "checkmark.square.fill" : "square")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(isEnabled ? (isOn ? Color(hex: "30D158") : Color.theme(.secondaryText)) : Color.theme(.secondaryText).opacity(0.35))
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityLabel("Show label")
+        .accessibilityValue(isOn ? "On" : "Off")
     }
 }
 

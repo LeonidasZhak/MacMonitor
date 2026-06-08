@@ -5,6 +5,7 @@ import ServiceManagement
 
 extension Notification.Name {
     static let menuBarLayoutChanged = Notification.Name("menuBarLayoutChanged")
+    static let companionSettingsChanged = Notification.Name("companionSettingsChanged")
 }
 
 enum MenuBarMetric: String, CaseIterable, Identifiable {
@@ -399,6 +400,8 @@ enum AppearanceStore {
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     var statusItem: NSStatusItem?
+    var companionItem: NSStatusItem?
+    var companionView: StatusBarPetView?
     var popover    = NSPopover()
     var welcomeWin: NSWindow?
     var settingsWin: NSWindow?
@@ -414,6 +417,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         setupMenuBar()
+        syncCompanionItem()
         model.startMonitoring()
 
         // Drive the label from published model values — fires immediately on change.
@@ -438,6 +442,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateLabel()
+                self?.companionView?.needsDisplay = true
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .companionSettingsChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.syncCompanionItem()
             }
             .store(in: &cancellables)
 
@@ -483,6 +494,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                                selector: #selector(popoverDidClose),
                                                name: NSPopover.didCloseNotification,
                                                object: popover)
+    }
+
+    private func syncCompanionItem() {
+        let enabled = UserDefaults.standard.object(forKey: "enableCompanionCat") == nil
+            ? true
+            : UserDefaults.standard.bool(forKey: "enableCompanionCat")
+        if enabled {
+            if companionItem == nil {
+                let item = NSStatusBar.system.statusItem(withLength: 58)
+                let view = StatusBarPetView(frame: NSRect(x: 0, y: 0, width: 58, height: 22))
+                view.onPrimaryClick = { [weak self] in
+                    self?.companionView?.pet()
+                }
+                view.onSecondaryClick = { [weak self] in
+                    if let button = self?.statusItem?.button {
+                        self?.togglePopover(button)
+                    }
+                }
+                if let button = item.button {
+                    button.title = ""
+                    button.image = nil
+                    button.addSubview(view)
+                    view.translatesAutoresizingMaskIntoConstraints = false
+                    NSLayoutConstraint.activate([
+                        view.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+                        view.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+                        view.topAnchor.constraint(equalTo: button.topAnchor),
+                        view.bottomAnchor.constraint(equalTo: button.bottomAnchor)
+                    ])
+                }
+                companionItem = item
+                companionView = view
+            }
+            companionView?.start()
+        } else {
+            companionView?.stop()
+            if let companionItem {
+                NSStatusBar.system.removeStatusItem(companionItem)
+            }
+            companionItem = nil
+            companionView = nil
+        }
     }
 
     private func updateLabel() {
@@ -635,5 +688,144 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWin = win
+    }
+}
+
+final class StatusBarPetView: NSView {
+    var onPrimaryClick: (() -> Void)?
+    var onSecondaryClick: (() -> Void)?
+
+    private var timer: Timer?
+    private var x: CGFloat = 4
+    private var direction: CGFloat = 1
+    private var blinkFrames = 0
+    private var happyFrames = 0
+    private var frameTick = 0
+
+    override var acceptsFirstResponder: Bool { true }
+
+    func start() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+            self?.advance()
+        }
+        RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    func pet() {
+        happyFrames = 8
+        needsDisplay = true
+    }
+
+    private func advance() {
+        frameTick += 1
+        if frameTick % 17 == 0 {
+            blinkFrames = 2
+        } else if blinkFrames > 0 {
+            blinkFrames -= 1
+        }
+        if happyFrames > 0 {
+            happyFrames -= 1
+        }
+        x += direction * 1.6
+        if x > bounds.width - 27 {
+            x = bounds.width - 27
+            direction = -1
+        } else if x < 4 {
+            x = 4
+            direction = 1
+        }
+        needsDisplay = true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) {
+            onSecondaryClick?()
+        } else {
+            onPrimaryClick?()
+        }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        onSecondaryClick?()
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.clear.setFill()
+        dirtyRect.fill()
+
+        let y = max(3, (bounds.height - 15) / 2)
+        let body = NSRect(x: x + 6, y: y + 2, width: 17, height: 10)
+        let head = NSRect(x: x + (direction > 0 ? 18 : 0), y: y + 5, width: 11, height: 9)
+        let tailStart = NSPoint(x: direction > 0 ? body.minX : body.maxX, y: body.midY + 2)
+        let tailEnd = NSPoint(x: tailStart.x - direction * 6, y: tailStart.y + (frameTick % 2 == 0 ? 3 : -1))
+
+        let fill = NSColor(Color.theme(.weather)).withAlphaComponent(happyFrames > 0 ? 0.98 : 0.88)
+        let stroke = NSColor(Color.theme(.primaryText)).withAlphaComponent(0.24)
+        fill.setFill()
+        stroke.setStroke()
+
+        let bodyPath = NSBezierPath(roundedRect: body, xRadius: 5, yRadius: 5)
+        bodyPath.fill()
+        bodyPath.lineWidth = 0.8
+        bodyPath.stroke()
+
+        let headPath = NSBezierPath(roundedRect: head, xRadius: 4, yRadius: 4)
+        headPath.fill()
+        headPath.stroke()
+
+        let earOffset: CGFloat = direction > 0 ? 2 : 7
+        let ear1 = NSBezierPath()
+        ear1.move(to: NSPoint(x: head.minX + earOffset, y: head.maxY - 1))
+        ear1.line(to: NSPoint(x: head.minX + earOffset + 2, y: head.maxY + 3))
+        ear1.line(to: NSPoint(x: head.minX + earOffset + 4, y: head.maxY - 1))
+        ear1.close()
+        ear1.fill()
+        let ear2 = NSBezierPath()
+        ear2.move(to: NSPoint(x: head.minX + earOffset + 4, y: head.maxY - 1))
+        ear2.line(to: NSPoint(x: head.minX + earOffset + 6, y: head.maxY + 3))
+        ear2.line(to: NSPoint(x: head.minX + earOffset + 8, y: head.maxY - 1))
+        ear2.close()
+        ear2.fill()
+
+        let tail = NSBezierPath()
+        tail.move(to: tailStart)
+        tail.curve(to: tailEnd,
+                   controlPoint1: NSPoint(x: tailStart.x - direction * 2, y: tailStart.y + 5),
+                   controlPoint2: NSPoint(x: tailEnd.x + direction * 2, y: tailEnd.y + 2))
+        tail.lineWidth = 2
+        tail.stroke()
+
+        NSColor(Color.theme(.background)).withAlphaComponent(0.72).setFill()
+        let eyeY = head.midY + 1
+        if blinkFrames > 0 {
+            let blink = NSBezierPath()
+            blink.move(to: NSPoint(x: head.midX + direction * 1, y: eyeY))
+            blink.line(to: NSPoint(x: head.midX + direction * 4, y: eyeY))
+            blink.lineWidth = 1
+            blink.stroke()
+        } else {
+            NSBezierPath(ovalIn: NSRect(x: head.midX + direction * 1.5, y: eyeY - 0.8, width: 2.2, height: 2.2)).fill()
+        }
+
+        let legY = body.minY - 1
+        NSColor(Color.theme(.weather)).withAlphaComponent(0.82).setStroke()
+        for legX in [body.minX + 4, body.maxX - 5] {
+            let leg = NSBezierPath()
+            leg.move(to: NSPoint(x: legX, y: body.minY + 1))
+            leg.line(to: NSPoint(x: legX + (frameTick % 2 == 0 ? 1 : -1), y: legY))
+            leg.lineWidth = 1.4
+            leg.stroke()
+        }
+
+        if happyFrames > 0 {
+            NSColor(Color.theme(.power)).withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: NSRect(x: x + 28, y: y + 12, width: 3, height: 3)).fill()
+        }
     }
 }

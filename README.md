@@ -102,6 +102,10 @@ network, disk, power, battery, weather, and TokenTracker. Optional modules
 include Open-Meteo weather for a saved location and a local TokenTracker summary
 when TokenTrackerBar is installed.
 
+An optional status bar pet can live next to the metrics as a separate animated
+menu bar item. It walks, blinks, reacts to clicks, and uses the same appearance
+colors as the dashboard preview.
+
 ### Full dashboard (click to open)
 
 | Section | What you see |
@@ -117,7 +121,7 @@ when TokenTrackerBar is installed.
 | **Power rails** | CPU · GPU · ANE · DRAM · System (PSTR) · Total |
 | **Processes** | Top 8 CPU consumers — name, CPU %, memory |
 | **Token Tracker** | Local TokenTrackerBar totals, cost, top models, and usage limits |
-| **Companion** | Optional lightweight dashboard companion |
+| **Companion** | Optional animated status bar pet with a dashboard preview |
 | **Optimize** | Purge disk cache + quit heavy apps |
 
 ### Appearance
