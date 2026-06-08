@@ -42,10 +42,15 @@ struct TokenTrackerStatus {
     let generatedAt: String?
 
     var menuSummary: String {
+        menuSummary(includeLabel: true)
+    }
+
+    func menuSummary(includeLabel: Bool) -> String {
+        let prefix = includeLabel ? "TOK " : ""
         if todayCost > 0 {
-            return "TOK \(Self.compactCount(todayTokens)) \(Self.compactUsd(todayCost))"
+            return "\(prefix)\(Self.compactCount(todayTokens)) \(Self.compactUsd(todayCost))"
         }
-        return "TOK \(Self.compactCount(todayTokens))"
+        return "\(prefix)\(Self.compactCount(todayTokens))"
     }
 
     static func compactCount(_ value: Double) -> String {

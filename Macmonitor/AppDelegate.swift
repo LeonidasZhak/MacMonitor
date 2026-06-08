@@ -88,11 +88,13 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
         case .memory:
             return "\(shortLabel) \(model.memPct)%"
         case .network:
-            return "\(shortLabel) ↓\(Self.formatRate(model.netInBps)) ↑\(Self.formatRate(model.netOutBps))"
+            let label = MenuBarLayoutStore.isLabelVisible(self) ? "\(shortLabel) " : ""
+            return "\(label)↓\(Self.formatRate(model.netInBps)) ↑\(Self.formatRate(model.netOutBps))"
         case .disk:
             let read = Int64(model.diskReadKBs * 1024)
             let write = Int64(model.diskWriteKBs * 1024)
-            return "\(shortLabel) R\(Self.formatRate(read)) W\(Self.formatRate(write))"
+            let label = MenuBarLayoutStore.isLabelVisible(self) ? "\(shortLabel) " : ""
+            return "\(label)R\(Self.formatRate(read)) W\(Self.formatRate(write))"
         case .power:
             guard model.totalPower > 0 else { return nil }
             return "\(shortLabel) \(String(format: "%.1fW", model.totalPower))"
@@ -103,8 +105,8 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
             guard !model.weatherText.isEmpty else { return nil }
             return model.weatherText
         case .tokenTracker:
-            guard !model.tokenTrackerText.isEmpty else { return nil }
-            return model.tokenTrackerText
+            guard let status = model.tokenTrackerStatus else { return nil }
+            return status.menuSummary(includeLabel: MenuBarLayoutStore.isLabelVisible(self))
         }
     }
 
@@ -119,6 +121,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
 enum MenuBarLayoutStore {
     private static let orderKey = "menuBarMetricOrder"
     private static let visiblePrefix = "menuBarMetricVisible."
+    private static let labelPrefix = "menuBarMetricLabelVisible."
 
     static func orderedMetrics() -> [MenuBarMetric] {
         let saved = UserDefaults.standard.stringArray(forKey: orderKey) ?? []
@@ -146,6 +149,30 @@ enum MenuBarLayoutStore {
         notify()
     }
 
+    static func canHideLabel(_ metric: MenuBarMetric) -> Bool {
+        switch metric {
+        case .network, .disk, .tokenTracker:
+            return true
+        case .cpu, .memory, .power, .battery, .weather:
+            return false
+        }
+    }
+
+    static func isLabelVisible(_ metric: MenuBarMetric) -> Bool {
+        guard canHideLabel(metric) else { return true }
+        let key = labelPrefix + metric.rawValue
+        guard UserDefaults.standard.object(forKey: key) != nil else {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    static func setLabelVisible(_ metric: MenuBarMetric, _ visible: Bool) {
+        guard canHideLabel(metric) else { return }
+        UserDefaults.standard.set(visible, forKey: labelPrefix + metric.rawValue)
+        notify()
+    }
+
     static func move(_ metric: MenuBarMetric, direction: Int) {
         var metrics = orderedMetrics()
         guard let index = metrics.firstIndex(of: metric) else { return }
@@ -160,6 +187,7 @@ enum MenuBarLayoutStore {
         UserDefaults.standard.removeObject(forKey: orderKey)
         for metric in MenuBarMetric.allCases {
             UserDefaults.standard.removeObject(forKey: visiblePrefix + metric.rawValue)
+            UserDefaults.standard.removeObject(forKey: labelPrefix + metric.rawValue)
         }
         notify()
     }
@@ -250,6 +278,9 @@ enum AppearancePreset: String, CaseIterable, Identifiable {
     case graphite
     case neon
     case field
+    case studio
+    case aurora
+    case ember
 
     var id: String { rawValue }
 
@@ -259,6 +290,9 @@ enum AppearancePreset: String, CaseIterable, Identifiable {
         case .graphite: return "Graphite"
         case .neon:     return "Neon"
         case .field:    return "Field"
+        case .studio:   return "Studio"
+        case .aurora:   return "Aurora"
+        case .ember:    return "Ember"
         }
     }
 
@@ -289,6 +323,30 @@ enum AppearancePreset: String, CaseIterable, Identifiable {
                 .cpu: "2DD4BF", .memory: "60A5FA", .networkDown: "22C55E", .networkUp: "F59E0B",
                 .diskRead: "38BDF8", .diskWrite: "FB923C", .power: "EAB308", .battery: "84CC16",
                 .weather: "0EA5E9", .tokenTracker: "A78BFA"
+            ]
+        case .studio:
+            return [
+                .background: "111114", .panel: "202126", .primaryText: "F6F7FB",
+                .secondaryText: "AAB0BB", .separator: "5E6778",
+                .cpu: "7DD3FC", .memory: "C4B5FD", .networkDown: "86EFAC", .networkUp: "FCA5A5",
+                .diskRead: "93C5FD", .diskWrite: "FDBA74", .power: "FDE047", .battery: "A7F3D0",
+                .weather: "67E8F9", .tokenTracker: "F0ABFC"
+            ]
+        case .aurora:
+            return [
+                .background: "07100F", .panel: "10201F", .primaryText: "F1FDF8",
+                .secondaryText: "9CCBC0", .separator: "37BDA1",
+                .cpu: "34D399", .memory: "5EEAD4", .networkDown: "A3E635", .networkUp: "FBBF24",
+                .diskRead: "22D3EE", .diskWrite: "FB7185", .power: "FDE047", .battery: "BEF264",
+                .weather: "38BDF8", .tokenTracker: "E879F9"
+            ]
+        case .ember:
+            return [
+                .background: "140F0D", .panel: "241B18", .primaryText: "FFF7ED",
+                .secondaryText: "D6B9A7", .separator: "B56E4A",
+                .cpu: "F97316", .memory: "60A5FA", .networkDown: "4ADE80", .networkUp: "FBBF24",
+                .diskRead: "67E8F9", .diskWrite: "FB7185", .power: "FDE047", .battery: "84CC16",
+                .weather: "7DD3FC", .tokenTracker: "C084FC"
             ]
         }
     }
@@ -343,11 +401,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var popover    = NSPopover()
     var welcomeWin: NSWindow?
+    var settingsWin: NSWindow?
     let model      = SystemStatsModel()
 
     // Subscribe to model changes so the label updates in sync with each tick,
     // not on a separate independent timer that may fire before data is ready.
     private var cancellables = Set<AnyCancellable>()
+    private var popoverGlobalEventMonitor: Any?
+    private var popoverLocalEventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -413,8 +474,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior    = .transient
         popover.animates    = true
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView(model: model).preferredColorScheme(.dark)
+            rootView: PopoverView(model: model) { [weak self] in
+                self?.openSettings()
+            }
+            .preferredColorScheme(.dark)
         )
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(popoverDidClose),
+                                               name: NSPopover.didCloseNotification,
+                                               object: popover)
     }
 
     private func updateLabel() {
@@ -445,6 +513,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+            startPopoverDismissMonitoring()
+        }
+    }
+
+    private func startPopoverDismissMonitoring() {
+        guard popoverGlobalEventMonitor == nil, popoverLocalEventMonitor == nil else { return }
+        popoverGlobalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.closePopover()
+            }
+        }
+        popoverLocalEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.closePopoverIfClickIsOutside(event)
+            return event
+        }
+    }
+
+    private func closePopoverIfClickIsOutside(_ event: NSEvent) {
+        guard popover.isShown else { return }
+        if let popoverWindow = popover.contentViewController?.view.window,
+           event.window == popoverWindow {
+            return
+        }
+        if let button = statusItem?.button,
+           event.window == button.window {
+            let point = button.convert(event.locationInWindow, from: nil)
+            if button.bounds.contains(point) {
+                return
+            }
+        }
+        closePopover()
+    }
+
+    private func closePopover() {
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        stopPopoverDismissMonitoring()
+    }
+
+    @objc private func popoverDidClose() {
+        stopPopoverDismissMonitoring()
+    }
+
+    private func stopPopoverDismissMonitoring() {
+        if let monitor = popoverGlobalEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            popoverGlobalEventMonitor = nil
+        }
+        if let monitor = popoverLocalEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            popoverLocalEventMonitor = nil
         }
     }
 
@@ -489,9 +609,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings window
 
     @objc func openSettings() {
+        closePopover()
+        if let settingsWin, settingsWin.isVisible {
+            settingsWin.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
         let win = NSWindow(
-            contentRect:  NSRect(x: 0, y: 0, width: 380, height: 560),
-            styleMask:    [.titled, .closable, .fullSizeContentView],
+            contentRect:  NSRect(x: 0, y: 0, width: 430, height: 640),
+            styleMask:    [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing:      .buffered,
             defer:        false
         )
@@ -499,11 +626,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         win.titlebarAppearsTransparent = true
         win.backgroundColor            = NSColor(Color(hex: "1C1C1E"))
         win.contentViewController      = NSHostingController(
-            rootView: SettingsSheet(isPresented: .constant(true))
+            rootView: SettingsSheet(isPresented: .constant(true)) { [weak self] in
+                self?.settingsWin?.close()
+            }
                 .preferredColorScheme(.dark)
         )
         win.center()
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        settingsWin = win
     }
 }

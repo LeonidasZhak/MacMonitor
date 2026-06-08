@@ -85,9 +85,11 @@ MacMonitor 2.0 reads **all hardware data directly from Apple's kernel interfaces
 
 ### Configurable menu bar indicator
 
-Updates every 2 seconds. One glance tells you if everything is fine. Open
-Settings to choose which metrics appear in the menu bar and arrange them in the
-order you prefer.
+Updates every 2 seconds. One glance tells you if everything is fine. Open the
+standalone Settings window to choose which metrics appear in the menu
+bar and arrange them in the order you prefer. Network, disk, and TokenTracker
+can also hide their short `NET` / `DSK` / `TOK` labels for a more compact menu
+bar while keeping the live values visible.
 
 ```
 ● CPU 12%  MEM 47%  NET ↓24K/s ↑3K/s  DSK R0B/s W0B/s    →  green dot  — all clear
@@ -120,9 +122,9 @@ when TokenTrackerBar is installed.
 
 ### Appearance
 
-Settings includes color presets, per-role color pickers, quick swatches, and
-chart style controls. Metric colors, panel colors, text colors, separators, and
-bar rendering can be customized without editing code.
+Settings includes multiple color presets, per-role color pickers, quick
+swatches, and chart style controls. Metric colors, panel colors, text colors,
+separators, and bar rendering can be customized without editing code.
 
 ### Desktop widget
 

@@ -6,13 +6,13 @@ import AppKit
 
 struct PopoverView: View {
     @ObservedObject var model: SystemStatsModel
-    @State private var showSettings = false
+    let openSettings: () -> Void
     @State private var appearanceRevision = 0
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
-                Header(model: model, showSettings: $showSettings)
+                Header(model: model, openSettings: openSettings)
                 if model.helperMissing {
                     HelperMissingBanner()
                 }
@@ -46,9 +46,6 @@ struct PopoverView: View {
         }
         .frame(width: 340)
         .background(Color.theme(.background))
-        .sheet(isPresented: $showSettings) {
-            SettingsSheet(isPresented: $showSettings)
-        }
         .onReceive(NotificationCenter.default.publisher(for: .appearanceChanged)) { _ in
             appearanceRevision += 1
         }
@@ -92,7 +89,7 @@ private struct HelperMissingBanner: View {
 
 private struct Header: View {
     @ObservedObject var model: SystemStatsModel
-    @Binding var showSettings: Bool
+    let openSettings: () -> Void
     @ObservedObject private var updater = UpdateChecker.shared
 
     var thermalColor: Color {
@@ -125,7 +122,7 @@ private struct Header: View {
                     .font(.system(size: 10))
                     .foregroundColor(Color.theme(.secondaryText))
             }
-            Button { showSettings = true } label: {
+            Button { openSettings() } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 13))
@@ -625,12 +622,14 @@ private struct FooterBar: View {
 
 struct SettingsSheet: View {
     @Binding var isPresented: Bool
+    var onClose: () -> Void = {}
     @AppStorage("enableMenuBar") var enableMenuBar = true
     @AppStorage("enableWidget")  var enableWidget  = false
     @AppStorage("openAtLogin")   var openAtLogin   = false
     @AppStorage("enableCompanionCat") var enableCompanionCat = true
     @AppStorage("weatherLocation") var weatherLocation = ""
     @State private var menuMetrics = MenuBarLayoutStore.orderedMetrics()
+    @State private var appearanceRevision = 0
     @ObservedObject private var updater = UpdateChecker.shared
 
     var body: some View {
@@ -725,7 +724,10 @@ struct SettingsSheet: View {
                                         .tint(Color(hex: "FF9F0A"))
                                         .font(.system(size: 12, weight: .semibold))
                                 }
-                                Button("Done") { isPresented = false }
+                                Button("Done") {
+                                    isPresented = false
+                                    onClose()
+                                }
                                     .buttonStyle(.borderedProminent)
                                     .tint(Color(hex: "0A84FF"))
                             }
@@ -757,11 +759,15 @@ struct SettingsSheet: View {
                 }
             }
             .padding(22)
+            .id(appearanceRevision)
         }
-        .frame(width: 360, height: 520)
+        .frame(width: 410, height: 600)
         .background(Color.theme(.panel))
         .preferredColorScheme(.dark)
         .onAppear { menuMetrics = MenuBarLayoutStore.orderedMetrics() }
+        .onReceive(NotificationCenter.default.publisher(for: .appearanceChanged)) { _ in
+            appearanceRevision += 1
+        }
         .onChange(of: weatherLocation) { _ in
             NotificationCenter.default.post(name: .menuBarLayoutChanged, object: nil)
         }
@@ -794,7 +800,7 @@ private struct AppearanceEditor: View {
                 .frame(width: 178)
             }
 
-            HStack(spacing: 6) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 6)], spacing: 6) {
                 ForEach(AppearancePreset.allCases) { preset in
                     Button(preset.title) {
                         AppearanceStore.apply(preset)
@@ -943,6 +949,19 @@ private struct MenuBarMetricRow: View {
                     .lineLimit(1)
             }
             Spacer()
+            if MenuBarLayoutStore.canHideLabel(metric) {
+                Toggle("Label", isOn: Binding(
+                    get: { MenuBarLayoutStore.isLabelVisible(metric) },
+                    set: { visible in
+                        MenuBarLayoutStore.setLabelVisible(metric, visible)
+                        metrics = MenuBarLayoutStore.orderedMetrics()
+                    }
+                ))
+                .toggleStyle(.checkbox)
+                .font(.system(size: 10))
+                .foregroundColor(Color.theme(.secondaryText))
+                .disabled(!MenuBarLayoutStore.isVisible(metric))
+            }
             Toggle("", isOn: Binding(
                 get: { MenuBarLayoutStore.isVisible(metric) },
                 set: { visible in
