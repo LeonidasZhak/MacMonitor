@@ -7,17 +7,18 @@ struct WelcomeView: View {
     @AppStorage("enableMenuBar") var enableMenuBar = true
     @AppStorage("enableWidget")  var enableWidget  = false
     @AppStorage("hasLaunched")   var hasLaunched   = false
+    @AppStorage("appTheme") private var appTheme = AppTheme.automatic.rawValue
 
     var body: some View {
         ZStack {
-            Color(hex: "0E0E12").ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Step indicator
                 HStack(spacing: 6) {
                     ForEach(0..<3) { i in
                         Capsule()
-                            .fill(i == step ? Color(hex:"0A84FF") : Color.white.opacity(0.12))
+                            .fill(i == step ? Color(hex:"0A84FF") : Color.primary.opacity(0.12))
                             .frame(width: i == step ? 20 : 6, height: 6)
                             .animation(.easeInOut(duration: 0.3), value: step)
                     }
@@ -63,7 +64,7 @@ struct WelcomeView: View {
             }
         }
         .frame(width: 480, height: 420)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(AppTheme(rawValue: appTheme)?.colorScheme)
     }
 }
 
@@ -82,10 +83,10 @@ private struct StepWelcome: View {
             VStack(spacing: 8) {
                 Text("Welcome to MacMonitor")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text("Real-time CPU, GPU, memory, battery and power\nmonitoring built for Apple Silicon.")
                     .font(.system(size: 13))
-                    .foregroundColor(Color(hex: "ABABC0"))
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
             }
@@ -111,7 +112,7 @@ private struct StepMode: View {
         VStack(spacing: 24) {
             VStack(spacing: 6) {
                 Text("Choose your setup")
-                    .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                    .font(.system(size: 20, weight: .bold)).foregroundColor(.primary)
                 Text("You can change this anytime in Settings.")
                     .font(.system(size: 12)).foregroundColor(Color(hex:"666680"))
             }
@@ -142,7 +143,7 @@ private struct StepPermission: View {
         VStack(spacing: 24) {
             VStack(spacing: 6) {
                 Text("One-time permission")
-                    .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                    .font(.system(size: 20, weight: .bold)).foregroundColor(.primary)
                 Text("MacMonitor needs sudo once to read GPU, temperature, and power data.")
                     .font(.system(size: 12)).foregroundColor(Color(hex:"666680"))
                     .multilineTextAlignment(.center)
@@ -201,7 +202,7 @@ private struct ModeCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(selected ? .white : Color(hex:"888899"))
+                        .foregroundColor(selected ? .primary : .secondary)
                     Text(desc)
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex:"666680"))
@@ -216,10 +217,10 @@ private struct ModeCard: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(selected ? Color(hex:"0A84FF").opacity(0.08) : Color.white.opacity(0.03))
+                    .fill(selected ? Color(hex:"0A84FF").opacity(0.08) : Color.primary.opacity(0.03))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(selected ? Color(hex:"0A84FF").opacity(0.4) : Color.white.opacity(0.06))
+                            .stroke(selected ? Color(hex:"0A84FF").opacity(0.4) : Color.primary.opacity(0.08))
                     )
             )
         }
@@ -242,7 +243,7 @@ private struct PermRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text(desc)
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex:"666680"))

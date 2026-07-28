@@ -1,11 +1,28 @@
 import SwiftUI
 import ServiceManagement
 
+enum AppTheme: String, CaseIterable, Identifiable {
+    case automatic
+    case light
+    case dark
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .automatic: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 // MARK: - Root
 
 struct PopoverView: View {
     @ObservedObject var model: SystemStatsModel
     @State private var showSettings = false
+    @AppStorage("appTheme") private var appTheme = AppTheme.automatic.rawValue
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -37,7 +54,8 @@ struct PopoverView: View {
             }
         }
         .frame(width: 340)
-        .background(Color(hex: "0E0E12"))
+        .background(Color(nsColor: .windowBackgroundColor))
+        .preferredColorScheme(AppTheme(rawValue: appTheme)?.colorScheme)
         .sheet(isPresented: $showSettings) {
             SettingsSheet(isPresented: $showSettings)
         }
@@ -45,7 +63,7 @@ struct PopoverView: View {
 
     private var sep: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.06))
+            .fill(Color.primary.opacity(0.08))
             .frame(height: 1)
             .padding(.horizontal, 14)
     }
@@ -96,7 +114,7 @@ private struct Header: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.chipName)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 HStack(spacing: 5) {
                     Circle().fill(thermalColor).frame(width: 6, height: 6)
                     Text(model.thermalState)
@@ -108,7 +126,7 @@ private struct Header: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.1f W", model.totalPower))
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text("total power")
                     .font(.system(size: 10))
                     .foregroundColor(Color(hex: "666680"))
@@ -190,7 +208,7 @@ private struct FanSection: View {
                 HStack {
                     Text("\(model.fanRPM) RPM")
                         .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Spacer()
                 }
             }
@@ -298,7 +316,7 @@ private struct NetworkDiskSection: View {
                 IORow(icon: "arrow.down", val: fmtB(model.netInBps)  + "/s", color: Color(hex:"30D158"))
                 IORow(icon: "arrow.up",   val: fmtB(model.netOutBps) + "/s", color: Color(hex:"FF9F0A"))
             }
-            Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1)
+            Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
             SectionBox(icon: "internaldrive", title: "Disk I/O") {
                 IORow(icon: "arrow.down", val: String(format: "%.0f KB/s", model.diskReadKBs),  color: Color(hex:"64D2FF"))
                 IORow(icon: "arrow.up",   val: String(format: "%.0f KB/s", model.diskWriteKBs), color: Color(hex:"FF9F0A"))
@@ -314,7 +332,7 @@ private struct IORow: View {
             Image(systemName: icon).font(.system(size: 9)).foregroundColor(color)
             Text(val)
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(Color(hex: "EBEBF5"))
+                .foregroundColor(.primary)
             Spacer()
         }
     }
@@ -348,10 +366,10 @@ private struct PowerTile: View {
             Spacer()
             Text(String(format: val >= 1 ? "%.2f W" : "%.3f W", val))
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(highlight ? Color(hex:"FFD60A") : .white)
+                .foregroundColor(highlight ? Color(hex:"FFD60A") : .primary)
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(Color.white.opacity(highlight ? 0.07 : 0.03))
+        .background(Color.primary.opacity(highlight ? 0.07 : 0.03))
         .cornerRadius(6)
     }
 }
@@ -372,7 +390,7 @@ private struct ProcessSection: View {
             ForEach(model.topProcs) { p in
                 HStack(spacing: 0) {
                     Text(p.name)
-                        .font(.system(size: 11)).foregroundColor(Color(hex: "EBEBF5"))
+                        .font(.system(size: 11)).foregroundColor(.primary)
                         .lineLimit(1).truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(String(format: "%.1f%%", p.cpu))
@@ -429,12 +447,14 @@ struct SettingsSheet: View {
     @AppStorage("enableMenuBar") var enableMenuBar = true
     @AppStorage("enableWidget")  var enableWidget  = false
     @AppStorage("openAtLogin")   var openAtLogin   = false
+    @AppStorage("cpuOnlyMenuBar") var cpuOnlyMenuBar = true
+    @AppStorage("appTheme") private var appTheme = AppTheme.automatic.rawValue
     @ObservedObject private var updater = UpdateChecker.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Settings")
-                .font(.system(size: 16, weight: .bold)).foregroundColor(.white)
+                .font(.system(size: 16, weight: .bold)).foregroundColor(.primary)
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Menu Bar App", isOn: $enableMenuBar)
@@ -442,6 +462,27 @@ struct SettingsSheet: View {
                 Text("Live stats in your menu bar. Click to open the full dashboard.")
                     .font(.system(size: 11)).foregroundColor(Color(hex: "666680"))
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("CPU Percentage Only", isOn: $cpuOnlyMenuBar)
+                    .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
+                Text("Show a compact value such as 12% in the menu bar.")
+                    .font(.system(size: 11)).foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Appearance")
+                    .font(.system(size: 12, weight: .medium))
+                Picker("Appearance", selection: $appTheme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.label).tag(theme.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                Text("Automatic follows your Mac’s current appearance.")
+                    .font(.system(size: 11)).foregroundColor(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -467,12 +508,12 @@ struct SettingsSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
 
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("MacMonitor  v\(updater.currentVersion)")
-                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.white)
+                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.primary)
                     Group {
                         switch updater.updatePhase {
                         case .idle:
@@ -541,9 +582,9 @@ struct SettingsSheet: View {
                 }
             }
         }
-        .padding(22).frame(width: 320)
-        .background(Color(hex: "1C1C1E"))
-        .preferredColorScheme(.dark)
+        .padding(22).frame(width: 360)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .preferredColorScheme(AppTheme(rawValue: appTheme)?.colorScheme)
     }
 }
 
@@ -573,7 +614,7 @@ private struct Row<R: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.system(size: 11)).foregroundColor(Color(hex: "ABABC0"))
+                .font(.system(size: 11)).foregroundColor(.secondary)
                 .frame(width: 130, alignment: .leading).lineLimit(1)
             right
         }
@@ -589,7 +630,7 @@ private struct StatBar: View {
         HStack(spacing: 6) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.07))
+                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.08))
                     RoundedRectangle(cornerRadius: 3).fill(barColor)
                         .frame(width: g.size.width * CGFloat(min(pct,100)) / 100)
                         .animation(.easeInOut(duration: 0.4), value: pct)
@@ -597,7 +638,7 @@ private struct StatBar: View {
             }
             .frame(height: 7)
             Text("\(pct)%")
-                .font(.system(size: 11, design: .monospaced)).foregroundColor(.white)
+                .font(.system(size: 11, design: .monospaced)).foregroundColor(.primary)
                 .frame(width: 32, alignment: .trailing)
         }
     }
@@ -619,7 +660,7 @@ private struct CoreTile: View {
                 .frame(width: 22, alignment: .leading)
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.08))
                     RoundedRectangle(cornerRadius: 2).fill(color)
                         .frame(width: g.size.width * CGFloat(min(pct,100)) / 100)
                         .animation(.easeInOut(duration: 0.4), value: pct)
@@ -653,7 +694,7 @@ private struct KV: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(k).font(.system(size: 9)).foregroundColor(Color(hex:"666680"))
-            Text(v).font(.system(size: 11, design: .monospaced)).foregroundColor(Color(hex:"EBEBF5"))
+            Text(v).font(.system(size: 11, design: .monospaced)).foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

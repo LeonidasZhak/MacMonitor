@@ -13,9 +13,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Subscribe to model changes so the label updates in sync with each tick,
     // not on a separate independent timer that may fire before data is ready.
     private var cancellables = Set<AnyCancellable>()
+    private var lastCPU = 0
+    private var lastMem = 0
+    private var lastTemp = 0.0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        UserDefaults.standard.register(defaults: [
+            "cpuOnlyMenuBar": true,
+            "appTheme": AppTheme.automatic.rawValue
+        ])
 
         setupMenuBar()
         model.startMonitoring()
@@ -24,7 +31,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Publishers.CombineLatest3(model.$cpuUsage, model.$memPct, model.$cpuTemp)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] cpu, mem, temp in
+                self?.lastCPU = cpu
+                self?.lastMem = mem
+                self?.lastTemp = temp
                 self?.updateLabel(cpu: cpu, mem: mem, temp: temp)
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.updateLabel(cpu: self.lastCPU, mem: self.lastMem, temp: self.lastTemp)
             }
             .store(in: &cancellables)
 
@@ -52,6 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem?.button {
             btn.title  = "🟢 CPU --%  MEM --%"
+            btn.toolTip = "MacMonitor"
             btn.target = self
             btn.action = #selector(handleClick)
             btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -61,12 +80,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior    = .transient
         popover.animates    = true
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView(model: model).preferredColorScheme(.dark)
+            rootView: PopoverView(model: model)
         )
     }
 
     private func updateLabel(cpu: Int, mem: Int, temp: Double) {
         guard let btn = statusItem?.button else { return }
+        if UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar") {
+            btn.title = "\(cpu)%"
+            btn.toolTip = "CPU usage: \(cpu)%"
+            return
+        }
         let dot = cpu >= 85 || mem >= 85 ? "🔴"
                 : cpu >= 60 || mem >= 60 ? "🟡" : "🟢"
         let tempStr = temp > 0 ? String(format: " %.0f°", temp) : ""
@@ -122,7 +146,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         win.titlebarAppearsTransparent  = true
         win.titleVisibility             = .hidden
         win.isMovableByWindowBackground = true
-        win.backgroundColor             = NSColor(Color(hex: "0E0E12"))
+        win.backgroundColor             = .windowBackgroundColor
         win.contentViewController       = NSHostingController(rootView: WelcomeView())
         win.center()
         win.makeKeyAndOrderFront(nil)
@@ -134,17 +158,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openSettings() {
         let win = NSWindow(
-            contentRect:  NSRect(x: 0, y: 0, width: 320, height: 280),
+            contentRect:  NSRect(x: 0, y: 0, width: 360, height: 460),
             styleMask:    [.titled, .closable, .fullSizeContentView],
             backing:      .buffered,
             defer:        false
         )
         win.title                      = "MacMonitor Settings"
         win.titlebarAppearsTransparent = true
-        win.backgroundColor            = NSColor(Color(hex: "1C1C1E"))
+        win.backgroundColor            = .windowBackgroundColor
         win.contentViewController      = NSHostingController(
             rootView: SettingsSheet(isPresented: .constant(true))
-                .preferredColorScheme(.dark)
         )
         win.center()
         win.makeKeyAndOrderFront(nil)

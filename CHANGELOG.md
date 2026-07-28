@@ -7,6 +7,20 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
+## [2.0.3] — 2026-07-28
+
+### Added
+
+- **Compact CPU-only menu bar mode** — optionally show just the live CPU percentage
+  (for example, `12%`) instead of the full CPU, temperature, and memory label. This is
+  enabled by default and can be changed immediately in Settings.
+- **Light appearance** — the dashboard, settings, and welcome window now use adaptive
+  system colours and remain legible in both light and dark appearances.
+- **Automatic appearance switching** — Settings offers Automatic, Light, and Dark.
+  Automatic follows the current macOS appearance as it changes.
+
+---
+
 ## [2.0.2] — 2026-05-30
 
 ### The "Brew Install Actually Works" Release
