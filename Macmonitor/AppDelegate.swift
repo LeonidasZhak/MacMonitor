@@ -3,12 +3,16 @@ import SwiftUI
 import Combine
 import ServiceManagement
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     var statusItem: NSStatusItem?
     var popover    = NSPopover()
     var welcomeWin: NSWindow?
     let model      = SystemStatsModel()
+
+    // Anchor tracking for the popover — see beginTrackingAnchor(_:).
+    private var anchorObservers: [NSObjectProtocol] = []
+    private var anchorOrigin: NSPoint?
 
     // Subscribe to model changes so the label updates in sync with each tick,
     // not on a separate independent timer that may fire before data is ready.
@@ -60,6 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentSize = NSSize(width: 340, height: 640)
         popover.behavior    = .transient
         popover.animates    = true
+        popover.delegate    = self
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(model: model).preferredColorScheme(.dark)
         )
@@ -89,7 +94,73 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+            beginTrackingAnchor(sender)
         }
+    }
+
+    // MARK: - Anchor tracking
+
+    /// The popover is positioned relative to the status item button. In native
+    /// full-screen mode the menu bar auto-hides, which slides the button's window
+    /// off the top of the screen. AppKit keeps the popover attached to that anchor,
+    /// so it flashes and lands in the top-right corner with its top edge clipped.
+    ///
+    /// Rather than fight AppKit's positioning, dismiss the popover as soon as the
+    /// anchor stops being a valid thing to point at.
+    private func beginTrackingAnchor(_ button: NSStatusBarButton) {
+        endTrackingAnchor()
+
+        guard let anchorWindow = button.window else { return }
+        anchorOrigin = anchorWindow.frame.origin
+
+        let center = NotificationCenter.default
+
+        // The menu bar retracting moves the status item's window.
+        anchorObservers.append(
+            center.addObserver(forName: NSWindow.didMoveNotification,
+                               object: anchorWindow,
+                               queue: .main) { [weak self] _ in
+                self?.closeIfAnchorInvalid(anchorWindow)
+            }
+        )
+
+        // Display or Space changes can also relocate the anchor.
+        anchorObservers.append(
+            center.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                               object: nil,
+                               queue: .main) { [weak self] _ in
+                self?.closeIfAnchorInvalid(anchorWindow)
+            }
+        )
+    }
+
+    private func closeIfAnchorInvalid(_ anchorWindow: NSWindow) {
+        guard popover.isShown else { return }
+
+        // Anchor moved from where it was when the popover opened.
+        if let origin = anchorOrigin, anchorWindow.frame.origin != origin {
+            popover.performClose(nil)
+            return
+        }
+
+        // Anchor is no longer fully on its screen — nothing valid to point at.
+        if let screen = anchorWindow.screen, !screen.frame.contains(anchorWindow.frame) {
+            popover.performClose(nil)
+        }
+    }
+
+    private func endTrackingAnchor() {
+        for observer in anchorObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        anchorObservers.removeAll()
+        anchorOrigin = nil
+    }
+
+    // MARK: - NSPopoverDelegate
+
+    func popoverDidClose(_ notification: Notification) {
+        endTrackingAnchor()
     }
 
     func showContextMenu() {
