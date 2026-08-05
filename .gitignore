@@ -27,3 +27,18 @@ dist/
 # Instruments
 timeline.xctimeline
 playground.xcplayground
+
+# sensor-research — compiled scanner binaries (build locally, see CONTRIBUTING.md)
+sensor-research/what_is_accurate
+sensor-research/hid_scanner
+sensor-research/smc_scanner
+sensor-research/global_scanner
+sensor-research/final_logger
+sensor-research/internal_logic_test
+sensor-research/power_thermal_sandbox
+
+# sensor-research — local scanner output
+sensor-research/sandbox_data.txt
+sensor-research/sandbox_output.txt
+sensor-research/smc_keys_*.txt
+sensor-research/hid_sensors_*.txt
