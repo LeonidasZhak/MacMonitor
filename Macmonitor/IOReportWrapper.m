@@ -86,6 +86,21 @@ static BOOL isValidTemperature(double value) {
     return value > 10.0 && value < 150.0;
 }
 
+// CPU-domain temperature keys: Tp** (P-core cluster), Te** (E-core cluster) and
+// Ts0* (SoC / CPU complex).
+//
+// The Ts** case is deliberately narrowed to Ts0*. Ts1P and TsOP are SSD
+// proximity sensors, not CPU sensors — they sit around 31–33 °C while the Ts0*
+// complex sensors track the cores at 41–51 °C. Averaging them into the CPU
+// figure pulled it roughly 0.7 °C low at idle and further under load, because
+// the SSD sensors barely move while the cores climb. See SENSORS.md.
+static BOOL isCPUTemperatureSMCKey(const char *key) {
+    if (key[1] == 'p' || key[1] == 'e') {
+        return YES;
+    }
+    return key[1] == 's' && key[2] == '0';
+}
+
 static void loadTemperatureKeys(io_connect_t smcConn) {
     if (smcConn == 0 || gCpuTempKeyCount > 0 || gGpuTempKeyCount > 0) {
         return;
@@ -107,7 +122,7 @@ static void loadTemperatureKeys(io_connect_t smcConn) {
             continue;
         }
 
-        if ((key[1] == 'p' || key[1] == 'e' || key[1] == 's') && gCpuTempKeyCount < 64) {
+        if (isCPUTemperatureSMCKey(key) && gCpuTempKeyCount < 64) {
             strcpy(gCpuTempKeys[gCpuTempKeyCount++], key);
         } else if (key[1] == 'g' && gGpuTempKeyCount < 64) {
             strcpy(gGpuTempKeys[gGpuTempKeyCount++], key);

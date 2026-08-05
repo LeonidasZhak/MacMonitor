@@ -48,8 +48,14 @@ All values in **°C**.
 | `TMVR`  | Memory VRM temperature | 37.2 °C | High |
 | `T5SP`  | NAND / SSD controller | 35.1 °C | High |
 | `Ts1P` / `TsOP` | SSD proximity sensors | 31–33 °C | High |
-| `Ts0K`–`Ts0Y` | SSD thermal array (18 sensors) | 40–49 °C | High |
 | `TH0T` / `TH0x` | NAND flash chip temperature | 37.4 °C | High |
+
+> **Correction:** earlier revisions of this file also listed `Ts0K`–`Ts0Y` here as an
+> "SSD thermal array". That was wrong — those keys are **CPU/SoC complex** sensors and
+> are documented under [CPU Domain](#cpu-domain). Measured on an M2, `Ts0K`–`Ts0c` read
+> 41–51 °C and track the core clusters, while the genuine SSD sensors (`T5SP`, `Ts1P`,
+> `TsOP`, `TH0T`) sit 10 °C cooler at 31–37 °C. Only `Ts1P` and `TsOP` share the `Ts`
+> prefix with storage.
 
 ### System & Board
 
