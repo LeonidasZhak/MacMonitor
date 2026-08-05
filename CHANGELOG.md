@@ -7,6 +7,24 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
+## [2.0.4] — 2026-08-05
+
+### Fixed
+
+- **Dashboard no longer closes itself every time a value updates** — a regression
+  introduced by the 2.0.3 popover positioning fix made the dashboard effectively
+  impossible to use. The menu bar item is variable-width and its title is rewritten on
+  every metrics tick, so the label changes width whenever a reading gains or loses a
+  digit. Because menu bar items are laid out from the right, that width change shifts
+  the item's window horizontally — and the 2.0.3 code treated *any* movement of the
+  anchor as "the menu bar retracted" and dismissed the popover. It now only dismisses on
+  a vertical move, which is what actually happens when the menu bar hides. The
+  full-screen fix from 2.0.3 (#11) still applies.
+
+  Anyone on 2.0.3 should update.
+
+---
+
 ## [2.0.3] — 2026-08-05
 
 ### Fixed

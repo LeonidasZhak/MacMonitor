@@ -137,14 +137,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func closeIfAnchorInvalid(_ anchorWindow: NSWindow) {
         guard popover.isShown else { return }
 
-        // Anchor moved from where it was when the popover opened.
-        if let origin = anchorOrigin, anchorWindow.frame.origin != origin {
+        // Only a *vertical* move means the menu bar itself retracted.
+        //
+        // The status item uses NSStatusItem.variableLength and its title is rewritten
+        // on every metrics tick, so the label's width changes whenever a value gains or
+        // loses a digit. Menu bar items are laid out from the right, so a width change
+        // shifts the anchor window's origin.x — which is not a reason to dismiss.
+        // Comparing the full origin here closed the popover roughly once a second and
+        // made the dashboard impossible to interact with.
+        if let origin = anchorOrigin, abs(anchorWindow.frame.origin.y - origin.y) > 1 {
             popover.performClose(nil)
             return
         }
 
-        // Anchor is no longer fully on its screen — nothing valid to point at.
-        if let screen = anchorWindow.screen, !screen.frame.contains(anchorWindow.frame) {
+        // Anchor left its screen entirely — nothing valid to point at. Deliberately
+        // checks for *no* intersection rather than full containment, so a status item
+        // that is merely clipped by a crowded menu bar doesn't dismiss the popover.
+        if let screen = anchorWindow.screen, !screen.frame.intersects(anchorWindow.frame) {
             popover.performClose(nil)
         }
     }
