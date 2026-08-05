@@ -7,6 +7,36 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
+## [2.0.3] — 2026-08-05
+
+### Fixed
+
+- **Popover no longer jumps off-screen in full-screen mode** — with the menu bar
+  auto-hidden, scrolling inside the dashboard could make it flash and jump to the
+  top-right corner with its top edge clipped. The popover is anchored to the menu bar
+  item, and when the menu bar retracted the anchor slid off-screen and took the popover
+  with it. It now dismisses when its anchor moves or leaves the screen. (#11)
+- **CPU temperature no longer includes SSD sensors** — the CPU average collected every
+  `T[pes]*` SMC key, which swept in `Ts1P` and `TsOP`. Those are SSD proximity sensors
+  sitting around 31–33 °C that barely move under load, pulling the reported CPU
+  temperature roughly 0.7 °C low at idle and further under load.
+
+### Documentation
+
+- **Added the `sensor-research/` toolkit** — referenced from the README, `SENSORS.md`,
+  `CONTRIBUTING.md` and this changelog since 2.0.0, but never actually committed, so no
+  one could run the scanners to validate sensor keys on their own hardware. (#13)
+- **Clarified VRM vs memory sensors in `SENSORS.md`** — the VRM table had no description
+  column, so keys like `TVMr` appeared unexplained, and `TVm0` was documented twice with
+  conflicting meanings. SMC keys are case-sensitive: `TVm0` is the memory die, `TVM0` and
+  `TVMr` are voltage regulators. Also notes the expected VRM temperature range, which
+  runs well above die temperature by design. (#12)
+- **Corrected the `Ts0K`–`Ts0Y` range** — previously listed as an "SSD thermal array"
+  while the same keys were simultaneously documented as CPU/SoC complex sensors. They
+  are CPU/SoC sensors.
+
+---
+
 ## [2.0.2] — 2026-05-30
 
 ### The "Brew Install Actually Works" Release
