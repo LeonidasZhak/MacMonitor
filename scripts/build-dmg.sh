@@ -110,6 +110,48 @@ chmod +x "$HELPER_OUT"
 [ -x "$HELPER_OUT" ] || fail "Helper compile failed — see clang output above"
 ok "Helper embedded: $(basename "$HELPER_OUT")"
 
+# ── Re-sign the bundle ────────────────────────────────────────────────────────
+# Dropping the helper in after -exportArchive invalidates the bundle seal, which
+# left shipped builds reporting "code object is not signed at all". That was
+# survivable while the app was a single executable, but macOS refuses to load an
+# app extension inside an invalidly signed host — the widget silently never
+# appears in the gallery.
+#
+# Sign inside-out: nested code first, then the outer bundle. Ad-hoc (`-`) matches
+# what releases already shipped; swap in a Developer ID identity here if these
+# ever get notarised.
+step "Signing bundle (inside-out)..."
+SIGN_ID="${MACMONITOR_SIGN_ID:--}"
+
+codesign --force --sign "$SIGN_ID" --timestamp=none "$HELPER_OUT" \
+    || fail "Failed to sign macmonitor-helper"
+
+APPEX="$APP_PATH/Contents/PlugIns/MacMonitorWidget.appex"
+if [ -d "$APPEX" ]; then
+    WIDGET_ENT="$(dirname "$0")/../MacMonitorWidget/MacMonitorWidget.entitlements"
+    if [ -f "$WIDGET_ENT" ]; then
+        codesign --force --sign "$SIGN_ID" --timestamp=none \
+            --entitlements "$WIDGET_ENT" "$APPEX" || fail "Failed to sign widget extension"
+    else
+        codesign --force --sign "$SIGN_ID" --timestamp=none "$APPEX" \
+            || fail "Failed to sign widget extension"
+    fi
+    ok "Signed: MacMonitorWidget.appex"
+fi
+
+APP_ENT="$(dirname "$0")/../Macmonitor/MacMonitor.entitlements"
+if [ -f "$APP_ENT" ]; then
+    codesign --force --sign "$SIGN_ID" --timestamp=none \
+        --entitlements "$APP_ENT" "$APP_PATH" || fail "Failed to sign app bundle"
+else
+    codesign --force --sign "$SIGN_ID" --timestamp=none "$APP_PATH" \
+        || fail "Failed to sign app bundle"
+fi
+
+codesign --verify --deep --strict "$APP_PATH" \
+    || fail "Signature verification failed after re-signing"
+ok "Signature valid (deep, strict)"
+
 # ── Remove quarantine ─────────────────────────────────────────────────────────
 step "Removing quarantine flag..."
 xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true

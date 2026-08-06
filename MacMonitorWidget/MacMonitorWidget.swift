@@ -268,6 +268,21 @@ private func barColor(_ v: Int) -> Color {
     v >= 85 ? .red : v >= 60 ? .yellow : .green
 }
 
+private extension View {
+    /// `containerBackground(_:for:)` is macOS 14+, but the app supports macOS 13.
+    /// Desktop widgets only exist on 14 and later; on 13 the widget still works in
+    /// Notification Center, where the views supply their own background. Applying the
+    /// modifier where available keeps 14+ from rendering without a widget background.
+    @ViewBuilder
+    func widgetContainerBackground() -> some View {
+        if #available(macOS 14.0, *) {
+            containerBackground(.black, for: .widget)
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Widget declaration
 
 @main
@@ -276,7 +291,7 @@ struct MacMonitorWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: StatsProvider()) { entry in
             MacMonitorWidgetView(entry: entry)
-                .containerBackground(.black, for: .widget)
+                .widgetContainerBackground()
         }
         .configurationDisplayName("MacMonitor")
         .description("Live CPU & memory — works standalone")

@@ -7,17 +7,55 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12987DFC7BD99C87151D21BC /* MacMonitorWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B61A8F79BCA099885B02D3FC /* MacMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1B96ECCB5FD6A6C233AABEB8 /* MacMonitorWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACDF3862610B203F992E0B2 /* MacMonitorWidget.swift */; };
 		606C7E022F77A8C500F11BF3 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 606C7E032F77A8C500F11BF3 /* IOKit.framework */; };
+		890119AF7DE293970D5711EC /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCFCE42EF5D6695CFBD60D6D /* WidgetKit.framework */; };
+		B791BEEB1035C35B874E78B4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CFC155416A4FAEBABB0BDB56 /* SwiftUI.framework */; };
+		DA54B5240742A2D8CAEE482B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6280EF9467BE86AA3D988C7A /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		599D2D0E9588CC094361E5E8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 606C7DEC2F77A8C200F11BF3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F98850C00926870D3CE80FD1;
+			remoteInfo = MacMonitorWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DE4CC5A8692FDA8BF46397B7 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				12987DFC7BD99C87151D21BC /* MacMonitorWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0ACDF3862610B203F992E0B2 /* MacMonitorWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacMonitorWidget.swift; sourceTree = "<group>"; };
+		1CB36D9432E22CC9C1F884E2 /* MacMonitorWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = MacMonitorWidget.entitlements; sourceTree = "<group>"; };
 		606C7DF42F77A8C200F11BF3 /* Macmonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Macmonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		606C7E032F77A8C500F11BF3 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		6280EF9467BE86AA3D988C7A /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		B61A8F79BCA099885B02D3FC /* MacMonitorWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MacMonitorWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCFCE42EF5D6695CFBD60D6D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
+		CFC155416A4FAEBABB0BDB56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
+		E16BE2031BE5770D24B52192 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		606C7DF62F77A8C200F11BF3 /* Macmonitor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Macmonitor;
 			sourceTree = "<group>";
 		};
@@ -32,6 +70,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB68B526A0245C80736A8F2E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA54B5240742A2D8CAEE482B /* Cocoa.framework in Frameworks */,
+				890119AF7DE293970D5711EC /* WidgetKit.framework in Frameworks */,
+				B791BEEB1035C35B874E78B4 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -41,6 +89,7 @@
 				606C7DF62F77A8C200F11BF3 /* Macmonitor */,
 				606C7DF52F77A8C200F11BF3 /* Products */,
 				606C7E042F77A8C500F11BF3 /* Frameworks */,
+				AB4671716CF35D9350EA0139 /* MacMonitorWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -48,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				606C7DF42F77A8C200F11BF3 /* Macmonitor.app */,
+				B61A8F79BCA099885B02D3FC /* MacMonitorWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -56,8 +106,30 @@
 			isa = PBXGroup;
 			children = (
 				606C7E032F77A8C500F11BF3 /* IOKit.framework */,
+				8A032A07C30AF0ED571EA2AD /* OS X */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8A032A07C30AF0ED571EA2AD /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				6280EF9467BE86AA3D988C7A /* Cocoa.framework */,
+				CCFCE42EF5D6695CFBD60D6D /* WidgetKit.framework */,
+				CFC155416A4FAEBABB0BDB56 /* SwiftUI.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		AB4671716CF35D9350EA0139 /* MacMonitorWidget */ = {
+			isa = PBXGroup;
+			children = (
+				0ACDF3862610B203F992E0B2 /* MacMonitorWidget.swift */,
+				E16BE2031BE5770D24B52192 /* Info.plist */,
+				1CB36D9432E22CC9C1F884E2 /* MacMonitorWidget.entitlements */,
+			);
+			name = MacMonitorWidget;
+			path = MacMonitorWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -70,20 +142,37 @@
 				606C7DF02F77A8C200F11BF3 /* Sources */,
 				606C7DF12F77A8C200F11BF3 /* Frameworks */,
 				606C7DF22F77A8C200F11BF3 /* Resources */,
+				DE4CC5A8692FDA8BF46397B7 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				07033FF1E82C96790AABCC85 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				606C7DF62F77A8C200F11BF3 /* Macmonitor */,
 			);
 			name = Macmonitor;
-			packageProductDependencies = (
-			);
 			productName = Macmonitor;
 			productReference = 606C7DF42F77A8C200F11BF3 /* Macmonitor.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F98850C00926870D3CE80FD1 /* MacMonitorWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77A70C4283EC735F10E3ED3F /* Build configuration list for PBXNativeTarget "MacMonitorWidget" */;
+			buildPhases = (
+				B25040147B1276ECAF535187 /* Sources */,
+				BB68B526A0245C80736A8F2E /* Frameworks */,
+				B263C34BBDBC6E768E54E86E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MacMonitorWidget;
+			productName = MacMonitorWidget;
+			productReference = B61A8F79BCA099885B02D3FC /* MacMonitorWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -115,12 +204,20 @@
 			projectRoot = "";
 			targets = (
 				606C7DF32F77A8C200F11BF3 /* Macmonitor */,
+				F98850C00926870D3CE80FD1 /* MacMonitorWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		606C7DF22F77A8C200F11BF3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B263C34BBDBC6E768E54E86E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -137,9 +234,54 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B25040147B1276ECAF535187 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B96ECCB5FD6A6C233AABEB8 /* MacMonitorWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		07033FF1E82C96790AABCC85 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = MacMonitorWidget;
+			target = F98850C00926870D3CE80FD1 /* MacMonitorWidget */;
+			targetProxy = 599D2D0E9588CC094361E5E8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		5E53A443C86E14995474F627 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MacMonitorWidget/MacMonitorWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = C287WU2H3P;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacMonitorWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MacMonitor;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 2.0.4;
+				PRODUCT_BUNDLE_IDENTIFIER = rybo.Macmonitor.MacMonitorWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		606C7DFD2F77A8C400F11BF3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -291,7 +433,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = Macmonitor/MacMonitor-Bridging-Header.h;
+				SWIFT_OBJC_BRIDGING_HEADER = "Macmonitor/MacMonitor-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -328,11 +470,39 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = Macmonitor/MacMonitor-Bridging-Header.h;
+				SWIFT_OBJC_BRIDGING_HEADER = "Macmonitor/MacMonitor-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
+		};
+		6283E79DD601733402E1802F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MacMonitorWidget/MacMonitorWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = C287WU2H3P;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacMonitorWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MacMonitor;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 2.0.4;
+				PRODUCT_BUNDLE_IDENTIFIER = rybo.Macmonitor.MacMonitorWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -351,6 +521,15 @@
 			buildConfigurations = (
 				606C7E002F77A8C400F11BF3 /* Debug */,
 				606C7E012F77A8C400F11BF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77A70C4283EC735F10E3ED3F /* Build configuration list for PBXNativeTarget "MacMonitorWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E53A443C86E14995474F627 /* Release */,
+				6283E79DD601733402E1802F /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

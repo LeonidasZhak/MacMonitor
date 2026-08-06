@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App extensions must be sandboxed on macOS, unlike the host app.
+	     The widget needs no additional entitlements: it reads CPU load via
+	     host_processor_info, memory via host_statistics64 and thermal state via
+	     ProcessInfo, all of which are permitted inside the sandbox. It does not
+	     use the privileged helper, spawn processes, or read outside its container. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>
