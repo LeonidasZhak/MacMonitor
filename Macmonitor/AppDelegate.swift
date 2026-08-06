@@ -18,9 +18,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     // Subscribe to model changes so the label updates in sync with each tick,
     // not on a separate independent timer that may fire before data is ready.
     private var cancellables = Set<AnyCancellable>()
+    private var lastCPU = 0
+    private var lastMem = 0
+    private var lastTemp = 0.0
+    private var isCPUOnlyMenuBar = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        UserDefaults.standard.register(defaults: [
+            "cpuOnlyMenuBar": false,
+            "appTheme": AppTheme.automatic.rawValue
+        ])
+        isCPUOnlyMenuBar = UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar")
 
         setupMenuBar()
         model.startMonitoring()
@@ -29,7 +38,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         Publishers.CombineLatest3(model.$cpuUsage, model.$memPct, model.$cpuTemp)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] cpu, mem, temp in
+                self?.lastCPU = cpu
+                self?.lastMem = mem
+                self?.lastTemp = temp
                 self?.updateLabel(cpu: cpu, mem: mem, temp: temp)
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let isCPUOnly = UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar")
+                guard isCPUOnly != self.isCPUOnlyMenuBar else { return }
+                self.isCPUOnlyMenuBar = isCPUOnly
+                self.updateLabel(cpu: self.lastCPU, mem: self.lastMem, temp: self.lastTemp)
             }
             .store(in: &cancellables)
 
@@ -57,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem?.button {
             btn.title  = "🟢 CPU --%  MEM --%"
+            btn.toolTip = "MacMonitor"
             btn.target = self
             btn.action = #selector(handleClick)
             btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -67,12 +91,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         popover.animates    = true
         popover.delegate    = self
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView(model: model).preferredColorScheme(.dark)
+            rootView: PopoverView(model: model)
         )
     }
 
     private func updateLabel(cpu: Int, mem: Int, temp: Double) {
         guard let btn = statusItem?.button else { return }
+        if isCPUOnlyMenuBar {
+            btn.title = "\(cpu)%"
+            btn.toolTip = "CPU usage: \(cpu)%"
+            return
+        }
+        btn.toolTip = "MacMonitor"
         let dot = cpu >= 85 || mem >= 85 ? "🔴"
                 : cpu >= 60 || mem >= 60 ? "🟡" : "🟢"
         let tempStr = temp > 0 ? String(format: " %.0f°", temp) : ""
@@ -228,7 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         win.titlebarAppearsTransparent  = true
         win.titleVisibility             = .hidden
         win.isMovableByWindowBackground = true
-        win.backgroundColor             = NSColor(Color(hex: "0E0E12"))
+        win.backgroundColor             = .windowBackgroundColor
         win.contentViewController       = NSHostingController(rootView: WelcomeView())
         win.center()
         win.makeKeyAndOrderFront(nil)
@@ -247,14 +277,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
 
         let win = NSWindow(
-            contentRect:  NSRect(x: 0, y: 0, width: 320, height: 280),
+            contentRect:  NSRect(x: 0, y: 0, width: 360, height: 460),
             styleMask:    [.titled, .closable, .fullSizeContentView],
             backing:      .buffered,
             defer:        false
         )
         win.title                      = "MacMonitor Settings"
         win.titlebarAppearsTransparent = true
-        win.backgroundColor            = NSColor(Color(hex: "1C1C1E"))
+        // Adaptive so the window tracks the chosen appearance (#14) rather than
+        // being pinned to a dark hex value.
+        win.backgroundColor            = .windowBackgroundColor
         win.isReleasedWhenClosed       = false
 
         // SettingsSheet drives dismissal through its isPresented binding. As a
@@ -269,9 +301,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             }
         )
 
+        // No preferredColorScheme override — SettingsSheet applies the user's
+        // Automatic/Light/Dark choice itself.
         win.contentViewController = NSHostingController(
             rootView: SettingsSheet(isPresented: dismiss)
-                .preferredColorScheme(.dark)
         )
         win.delegate = self
         win.center()

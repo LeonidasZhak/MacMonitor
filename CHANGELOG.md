@@ -7,6 +7,41 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Compact CPU-only menu bar mode** — optionally show just the live CPU percentage
+  (for example, `12%`) instead of the full CPU, temperature, and memory label. Opt-in,
+  so the existing detailed indicator stays the default.
+  ([#14](https://github.com/ryyansafar/MacMonitor/pull/14), thanks @Fletcher-Alderton)
+- **Light appearance** — the dashboard, settings, and welcome window now use adaptive
+  system colours and remain legible in both light and dark appearances.
+  ([#14](https://github.com/ryyansafar/MacMonitor/pull/14), thanks @Fletcher-Alderton)
+- **Automatic appearance switching** — Settings offers Automatic, Light, and Dark.
+  Automatic follows the current macOS appearance as it changes.
+  ([#14](https://github.com/ryyansafar/MacMonitor/pull/14), thanks @Fletcher-Alderton)
+- **Desktop widget** — `MacMonitorWidget.swift` shipped in the repo since 2.0.0 but was
+  in no build target, so it never compiled and the "Desktop Widget" toggle in Settings
+  pointed at nothing. It is now a real app-extension target embedded in the app bundle.
+  Add it via right-click the desktop → Edit Widgets → MacMonitor. Small and medium sizes,
+  showing CPU, memory and thermal state. Works on macOS 14+ on the desktop and in
+  Notification Center on macOS 13.
+
+### Fixed
+
+- **Done button in Settings now closes the window** — Settings opened from the menu bar
+  passed the view a read-only `.constant(true)` binding, so Done wrote to nothing and the
+  red close button was the only way out. Opening Settings repeatedly also stacked a new
+  window each time; it now reuses one.
+- **Releases are signed again** — `build-dmg.sh` embedded the privileged helper *after*
+  `-exportArchive`, invalidating the bundle seal, so shipped builds reported "code object
+  is not signed at all". Harmless while the app was a single executable, but it blocked
+  the new widget entirely, since macOS refuses to load an app extension inside an
+  invalidly signed host. The bundle is now re-signed inside-out and verified.
+
+---
+
 ## [2.0.4] — 2026-08-05
 
 ### Fixed

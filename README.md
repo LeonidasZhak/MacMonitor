@@ -87,11 +87,18 @@ MacMonitor 2.0 reads **all hardware data directly from Apple's kernel interfaces
 
 Updates every 2 seconds. One glance tells you if everything is fine.
 
+Settings can also reduce the indicator to a compact CPU-only percentage such as `12%`.
+
 ```
 ● CPU 12%  MEM 47%    →  green dot  — all clear
 ● CPU 62%  MEM 71%    →  yellow dot — moderate load
 ● CPU 91%  MEM 87%    →  red dot    — heavy load, open dashboard
 ```
+
+### Appearance
+
+Choose **Automatic**, **Light**, or **Dark** in Settings. Automatic follows the current
+macOS appearance, including system appearance changes while MacMonitor is running.
 
 ### Full dashboard (click to open)
 
