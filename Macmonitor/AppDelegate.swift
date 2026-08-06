@@ -239,7 +239,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Widget refresh
 
-    private static let widgetReloadInterval: TimeInterval = 30
+    // Measured: chronod honoured app-driven reloads at a strict 30s with no drops, so
+    // the throttle was the bottleneck rather than the system budget. Pushed down to 5s,
+    // which is about as close to live as WidgetKit allows — widgets are snapshot-based
+    // and each reload wakes the extension, so this is a deliberate floor rather than a
+    // limit worth chasing further.
+    private static let widgetReloadInterval: TimeInterval = 5
 
     /// Pushes a timeline reload to the desktop widget so it tracks the dashboard.
     ///

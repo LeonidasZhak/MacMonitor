@@ -90,7 +90,10 @@ struct StatsProvider: TimelineProvider {
         }
 
         let (u1, t1) = ticks()
-        Thread.sleep(forTimeInterval: 0.8)
+        // CPU load needs two samples to difference. 0.8s made every render take nearly a
+        // second, which is a lot of the interval when reloads arrive every 5s; 0.4s is
+        // still a long enough window to be accurate for a percentage.
+        Thread.sleep(forTimeInterval: 0.4)
         let (u2, t2) = ticks()
         let dt = t2 - t1
         return dt > 0 ? min(100, Int(((u2 - u1) / dt * 100).rounded())) : 0
