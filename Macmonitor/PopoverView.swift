@@ -129,7 +129,7 @@ private struct Header: View {
                     .foregroundColor(.primary)
                 Text("total power")
                     .font(.system(size: 10))
-                    .foregroundColor(Color(hex: "666680"))
+                    .foregroundColor(.secondary)
             }
             Button { showSettings = true } label: {
                 ZStack(alignment: .topTrailing) {
@@ -385,7 +385,7 @@ private struct ProcessSection: View {
                 Text("CPU").frame(width: 40, alignment: .trailing)
                 Text("Memory").frame(width: 64, alignment: .trailing)
             }
-            .font(.system(size: 9)).foregroundColor(Color(hex: "666680"))
+            .font(.system(size: 9)).foregroundColor(.secondary)
 
             ForEach(model.topProcs) { p in
                 HStack(spacing: 0) {
@@ -447,7 +447,7 @@ struct SettingsSheet: View {
     @AppStorage("enableMenuBar") var enableMenuBar = true
     @AppStorage("enableWidget")  var enableWidget  = false
     @AppStorage("openAtLogin")   var openAtLogin   = false
-    @AppStorage("cpuOnlyMenuBar") var cpuOnlyMenuBar = true
+    @AppStorage("cpuOnlyMenuBar") var cpuOnlyMenuBar = false
     @AppStorage("appTheme") private var appTheme = AppTheme.automatic.rawValue
     @ObservedObject private var updater = UpdateChecker.shared
 
@@ -460,7 +460,7 @@ struct SettingsSheet: View {
                 Toggle("Menu Bar App", isOn: $enableMenuBar)
                     .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
                 Text("Live stats in your menu bar. Click to open the full dashboard.")
-                    .font(.system(size: 11)).foregroundColor(Color(hex: "666680"))
+                    .font(.system(size: 11)).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -496,7 +496,7 @@ struct SettingsSheet: View {
                         }
                     }
                 Text("Automatically start MacMonitor when you log in.")
-                    .font(.system(size: 11)).foregroundColor(Color(hex: "666680"))
+                    .font(.system(size: 11)).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -504,7 +504,7 @@ struct SettingsSheet: View {
                 Toggle("Desktop Widget", isOn: $enableWidget)
                     .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
                 Text("Right-click your desktop → Edit Widgets → find MacMonitor.")
-                    .font(.system(size: 11)).foregroundColor(Color(hex: "666680"))
+                    .font(.system(size: 11)).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -522,7 +522,7 @@ struct SettingsSheet: View {
                                     .foregroundColor(Color(hex: "FF9F0A"))
                             } else {
                                 Text("Apple Silicon  ·  macOS 13+  ·  MIT")
-                                    .foregroundColor(Color(hex: "666680"))
+                                    .foregroundColor(.secondary)
                             }
                         case .downloading:
                             Text("Downloading v\(updater.latestVersion)…")
@@ -563,7 +563,7 @@ struct SettingsSheet: View {
                                 .frame(width: 80)
                             Text("\(Int(updater.downloadFraction * 100))%")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(Color(hex: "888899"))
+                                .foregroundColor(.secondary)
                         }
                     case .installing:
                         ProgressView()
@@ -669,7 +669,7 @@ private struct CoreTile: View {
             .frame(height: 5)
             Text("\(Int(pct))%")
                 .font(.system(size: 9, design: .monospaced))
-                .foregroundColor(Color(hex:"666680"))
+                .foregroundColor(.secondary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .frame(width: 26, alignment: .trailing)
@@ -693,7 +693,7 @@ private struct KV: View {
     init(_ k: String, _ v: String) { self.k = k; self.v = v }
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(k).font(.system(size: 9)).foregroundColor(Color(hex:"666680"))
+            Text(k).font(.system(size: 9)).foregroundColor(.secondary)
             Text(v).font(.system(size: 11, design: .monospaced)).foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

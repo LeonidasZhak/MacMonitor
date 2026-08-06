@@ -7,13 +7,13 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
-## [2.0.3] — 2026-07-28
+## [Unreleased]
 
 ### Added
 
 - **Compact CPU-only menu bar mode** — optionally show just the live CPU percentage
   (for example, `12%`) instead of the full CPU, temperature, and memory label. This is
-  enabled by default and can be changed immediately in Settings.
+  available as an opt-in setting while preserving the existing detailed indicator by default.
 - **Light appearance** — the dashboard, settings, and welcome window now use adaptive
   system colours and remain legible in both light and dark appearances.
 - **Automatic appearance switching** — Settings offers Automatic, Light, and Dark.

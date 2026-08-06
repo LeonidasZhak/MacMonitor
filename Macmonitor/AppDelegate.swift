@@ -16,13 +16,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastCPU = 0
     private var lastMem = 0
     private var lastTemp = 0.0
+    private var isCPUOnlyMenuBar = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         UserDefaults.standard.register(defaults: [
-            "cpuOnlyMenuBar": true,
+            "cpuOnlyMenuBar": false,
             "appTheme": AppTheme.automatic.rawValue
         ])
+        isCPUOnlyMenuBar = UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar")
 
         setupMenuBar()
         model.startMonitoring()
@@ -42,6 +44,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
+                let isCPUOnly = UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar")
+                guard isCPUOnly != self.isCPUOnlyMenuBar else { return }
+                self.isCPUOnlyMenuBar = isCPUOnly
                 self.updateLabel(cpu: self.lastCPU, mem: self.lastMem, temp: self.lastTemp)
             }
             .store(in: &cancellables)
@@ -86,11 +91,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateLabel(cpu: Int, mem: Int, temp: Double) {
         guard let btn = statusItem?.button else { return }
-        if UserDefaults.standard.bool(forKey: "cpuOnlyMenuBar") {
+        if isCPUOnlyMenuBar {
             btn.title = "\(cpu)%"
             btn.toolTip = "CPU usage: \(cpu)%"
             return
         }
+        btn.toolTip = "MacMonitor"
         let dot = cpu >= 85 || mem >= 85 ? "🔴"
                 : cpu >= 60 || mem >= 60 ? "🟡" : "🟢"
         let tempStr = temp > 0 ? String(format: " %.0f°", temp) : ""
