@@ -3,11 +3,12 @@ import SwiftUI
 import Combine
 import ServiceManagement
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
 
     var statusItem: NSStatusItem?
     var popover    = NSPopover()
     var welcomeWin: NSWindow?
+    var settingsWin: NSWindow?
     let model      = SystemStatsModel()
 
     // Anchor tracking for the popover — see beginTrackingAnchor(_:).
@@ -172,6 +173,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         endTrackingAnchor()
     }
 
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        // Drop the reference so the next "Settings…" builds a fresh window rather
+        // than trying to reuse a closed one. Covers both Done and the close button.
+        if (notification.object as? NSWindow) === settingsWin {
+            settingsWin = nil
+        }
+    }
+
     func showContextMenu() {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Open Dashboard",
@@ -213,6 +224,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Settings window
 
     @objc func openSettings() {
+        // Reuse the existing window instead of stacking a new one on every invocation.
+        if let existing = settingsWin {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
         let win = NSWindow(
             contentRect:  NSRect(x: 0, y: 0, width: 320, height: 280),
             styleMask:    [.titled, .closable, .fullSizeContentView],
@@ -222,12 +240,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         win.title                      = "MacMonitor Settings"
         win.titlebarAppearsTransparent = true
         win.backgroundColor            = NSColor(Color(hex: "1C1C1E"))
-        win.contentViewController      = NSHostingController(
-            rootView: SettingsSheet(isPresented: .constant(true))
+        win.isReleasedWhenClosed       = false
+
+        // SettingsSheet drives dismissal through its isPresented binding. As a
+        // standalone window this used to be passed .constant(true), which is
+        // read-only — so tapping Done wrote to nothing and the window never closed.
+        // Back the binding with an actual close, weakly so the window and its
+        // content view don't retain each other.
+        let dismiss = Binding<Bool>(
+            get: { true },
+            set: { [weak win] shouldPresent in
+                if !shouldPresent { win?.performClose(nil) }
+            }
+        )
+
+        win.contentViewController = NSHostingController(
+            rootView: SettingsSheet(isPresented: dismiss)
                 .preferredColorScheme(.dark)
         )
+        win.delegate = self
         win.center()
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        settingsWin = win
     }
 }
