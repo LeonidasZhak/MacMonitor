@@ -239,12 +239,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Widget refresh
 
-    // Measured: chronod honoured app-driven reloads at a strict 30s with no drops, so
-    // the throttle was the bottleneck rather than the system budget. Pushed down to 5s,
-    // which is about as close to live as WidgetKit allows — widgets are snapshot-based
-    // and each reload wakes the extension, so this is a deliberate floor rather than a
-    // limit worth chasing further.
-    private static let widgetReloadInterval: TimeInterval = 5
+    // Measured, not guessed. chronod honoured app-driven reloads at a strict 30s with
+    // no drops, then at 5s (renders every 5.4-6.4s, zero rejections), so the throttle
+    // was always the bottleneck rather than the system budget. Now 2s.
+    //
+    // This is the floor worth using. Each reload wakes the widget extension, which then
+    // samples CPU over a 0.4s window before rendering, so a shorter interval would keep
+    // that process almost continuously awake for a glanceable snapshot. The dashboard is
+    // the live view; widgets are snapshot-based by design and cannot stream.
+    private static let widgetReloadInterval: TimeInterval = 2
 
     /// Pushes a timeline reload to the desktop widget so it tracks the dashboard.
     ///

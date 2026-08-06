@@ -7,7 +7,13 @@ Dates: ISO 8601 (YYYY-MM-DD)
 
 ---
 
-## [Unreleased]
+## [2.0.5] — 2026-08-06
+
+### The "Widget Actually Exists" Release
+
+Ships the desktop widget, which had been dead code in the repo since 2.0.0, adds the
+first real customization options, and fixes code signing — every release before this
+one shipped unsigned.
 
 ### Added
 
@@ -28,17 +34,41 @@ Dates: ISO 8601 (YYYY-MM-DD)
   showing CPU, memory and thermal state. Works on macOS 14+ on the desktop and in
   Notification Center on macOS 13.
 
+- **Widget refreshes about every 2 seconds** while MacMonitor is running, with rolling
+  digit animation on the readings. Widgets are snapshot-based, so this is as close to
+  live as WidgetKit allows — the dashboard remains the real-time view.
+
+### Changed
+
+- **Settings controls all do something now.** "Desktop Widget" was a switch writing a
+  preference nothing read; macOS owns whether a widget is placed, so it is now a
+  "Refresh Now" button plus accurate placement instructions. "Menu Bar App" was also
+  dead and was removed rather than left as a switch that lies — MacMonitor is a menu bar
+  app, so hiding the icon would remove the only way to reach it, including Settings.
+
 ### Fixed
 
+- **Clicking outside the dashboard collapses it**, the same as clicking the menu bar icon
+  again. `NSPopover.behavior = .transient` is meant to handle this, but the app runs as
+  an accessory: a click in another application is delivered to that application and never
+  reaches MacMonitor, so the dashboard just stayed open.
 - **Done button in Settings now closes the window** — Settings opened from the menu bar
   passed the view a read-only `.constant(true)` binding, so Done wrote to nothing and the
   red close button was the only way out. Opening Settings repeatedly also stacked a new
   window each time; it now reuses one.
+- **Widget spacing** — the medium layout left a large dead gap down the left column, and
+  the small layout had the same problem between the bars and the memory line. Both now
+  distribute space between rows instead of pushing all slack into one spacer.
 - **Releases are signed again** — `build-dmg.sh` embedded the privileged helper *after*
   `-exportArchive`, invalidating the bundle seal, so shipped builds reported "code object
   is not signed at all". Harmless while the app was a single executable, but it blocked
   the new widget entirely, since macOS refuses to load an app extension inside an
-  invalidly signed host. The bundle is now re-signed inside-out and verified.
+  invalidly signed host. The bundle is now re-signed inside-out and verified with
+  `codesign --verify --deep --strict`. **This is the first signed MacMonitor release.**
+- **Dashboard crash during window animation** — dismissing the popover synchronously from
+  a window-geometry notification ran inside a CoreAnimation transaction and could
+  over-release the window transform animation, seen as an `EXC_BAD_ACCESS` in
+  `objc_release`. Dismissal now defers to the next main-queue pass.
 
 ---
 
