@@ -145,33 +145,51 @@ struct SmallView: View {
     let e: StatsEntry
     var body: some View {
         // No opaque background here on purpose — see widgetContainerBackground().
-        VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 5) {
-                    Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
-                    Text("MacMonitor")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
-                WBar(label: "CPU", pct: e.cpu,  color: barColor(e.cpu))
-                WBar(label: "MEM", pct: e.mem,  color: barColor(e.mem))
+        //
+        // Slack is spread between rows rather than dumped into one Spacer, so the
+        // content fills the widget evenly instead of clumping at the top with a gap.
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 5) {
+                Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
+                Text("MacMonitor")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.primary)
                 Spacer(minLength: 0)
-                Text("\(e.memUsed) / \(e.memTotal)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white)
-                HStack {
-                    Circle().fill(dotColor(e.thermal)).frame(width: 5, height: 5)
-                    Text(e.thermal).font(.system(size: 9)).foregroundColor(dotColor(e.thermal))
-                    Spacer()
-                    Text(e.date, style: .time).font(.system(size: 9)).foregroundColor(.gray)
-                }
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .leading, spacing: 8) {
+                WBar(label: "CPU", pct: e.cpu, color: barColor(e.cpu))
+                WBar(label: "MEM", pct: e.mem, color: barColor(e.mem))
+            }
+
+            Spacer(minLength: 8)
+
+            Text("\(e.memUsed) / \(e.memTotal)")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.primary)
+                .numericTransition()
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 5) {
+                Circle().fill(dotColor(e.thermal)).frame(width: 5, height: 5)
+                Text(e.thermal).font(.system(size: 10)).foregroundColor(dotColor(e.thermal))
+                Spacer(minLength: 4)
+                Text(e.date, style: .time)
+                    .font(.system(size: 10)).foregroundColor(.secondary)
+            }
+
+            Spacer(minLength: 6)
+
             Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
                 Text("by ryyansafar · support ♥")
-                    .font(.system(size: 8))
-                    .foregroundColor(.gray.opacity(0.6))
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(11)
+        .padding(12)
     }
 }
 
@@ -180,37 +198,62 @@ struct MediumView: View {
     let e: StatsEntry
     var body: some View {
         // No opaque background here on purpose — see widgetContainerBackground().
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
+        //
+        // Both columns distribute their slack between rows instead of pushing it all
+        // into one Spacer. Previously the left column held only a header and two bars
+        // against the right column's four rows, so a single Spacer left a large dead
+        // gap on the left while the right side was full.
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 5) {
                     Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
                     Text("MacMonitor")
-                        .font(.system(size: 11, weight: .bold)).foregroundColor(.white)
+                        .font(.system(size: 12, weight: .bold)).foregroundColor(.primary)
+                    Spacer(minLength: 0)
                 }
-                WBar(label: "CPU", pct: e.cpu, color: barColor(e.cpu))
-                WBar(label: "MEM", pct: e.mem, color: barColor(e.mem))
-                Spacer(minLength: 0)
-                Text(e.date, style: .time).font(.system(size: 9)).foregroundColor(.gray)
+
+                Spacer(minLength: 10)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    WBar(label: "CPU", pct: e.cpu, color: barColor(e.cpu))
+                    WBar(label: "MEM", pct: e.mem, color: barColor(e.mem))
+                }
+
+                Spacer(minLength: 10)
+
+                HStack(spacing: 5) {
+                    Circle().fill(dotColor(e.thermal)).frame(width: 5, height: 5)
+                    Text(e.thermal)
+                        .font(.system(size: 10)).foregroundColor(dotColor(e.thermal))
+                    Spacer(minLength: 4)
+                    Text(e.date, style: .time)
+                        .font(.system(size: 10)).foregroundColor(.secondary)
+                }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Divider().background(Color.gray.opacity(0.3))
+            Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
-                InfoRow(label: "Thermal",  val: e.thermal,  color: dotColor(e.thermal))
-                InfoRow(label: "RAM used", val: e.memUsed,  color: .white)
-                InfoRow(label: "RAM total",val: e.memTotal, color: .gray)
-                InfoRow(label: "CPU load", val: "\(e.cpu)%",color: barColor(e.cpu))
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 0) {
+                InfoRow(label: "Thermal",   val: e.thermal,   color: dotColor(e.thermal))
+                Spacer(minLength: 8)
+                InfoRow(label: "RAM used",  val: e.memUsed,   color: .primary)
+                Spacer(minLength: 8)
+                InfoRow(label: "RAM total", val: e.memTotal,  color: .secondary)
+                Spacer(minLength: 8)
+                InfoRow(label: "CPU load",  val: "\(e.cpu)%", color: barColor(e.cpu))
+
+                Spacer(minLength: 10)
+
                 Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
                     Text("by ryyansafar · support ♥")
-                        .font(.system(size: 8))
-                        .foregroundColor(.gray.opacity(0.6))
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(13)
+        .padding(14)
     }
 }
 
