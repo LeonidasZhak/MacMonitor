@@ -140,9 +140,8 @@ struct MacMonitorWidgetView: View {
 struct SmallView: View {
     let e: StatsEntry
     var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.08, blue: 0.12)
-            VStack(alignment: .leading, spacing: 7) {
+        // No opaque background here on purpose — see widgetContainerBackground().
+        VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 5) {
                     Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
                     Text("MacMonitor")
@@ -162,14 +161,13 @@ struct SmallView: View {
                     Spacer()
                     Text(e.date, style: .time).font(.system(size: 9)).foregroundColor(.gray)
                 }
-                Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
-                    Text("by ryyansafar · support ♥")
-                        .font(.system(size: 8))
-                        .foregroundColor(.gray.opacity(0.6))
-                }
+            Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
+                Text("by ryyansafar · support ♥")
+                    .font(.system(size: 8))
+                    .foregroundColor(.gray.opacity(0.6))
             }
-            .padding(11)
         }
+        .padding(11)
     }
 }
 
@@ -177,40 +175,38 @@ struct SmallView: View {
 struct MediumView: View {
     let e: StatsEntry
     var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.08, blue: 0.12)
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 5) {
-                        Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
-                        Text("MacMonitor")
-                            .font(.system(size: 11, weight: .bold)).foregroundColor(.white)
-                    }
-                    WBar(label: "CPU", pct: e.cpu, color: barColor(e.cpu))
-                    WBar(label: "MEM", pct: e.mem, color: barColor(e.mem))
-                    Spacer(minLength: 0)
-                    Text(e.date, style: .time).font(.system(size: 9)).foregroundColor(.gray)
+        // No opaque background here on purpose — see widgetContainerBackground().
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 5) {
+                    Circle().fill(dotColor(e.thermal)).frame(width: 7, height: 7)
+                    Text("MacMonitor")
+                        .font(.system(size: 11, weight: .bold)).foregroundColor(.white)
                 }
-                .frame(maxWidth: .infinity)
-
-                Divider().background(Color.gray.opacity(0.3))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    InfoRow(label: "Thermal",  val: e.thermal,  color: dotColor(e.thermal))
-                    InfoRow(label: "RAM used", val: e.memUsed,  color: .white)
-                    InfoRow(label: "RAM total",val: e.memTotal, color: .gray)
-                    InfoRow(label: "CPU load", val: "\(e.cpu)%",color: barColor(e.cpu))
-                    Spacer(minLength: 0)
-                    Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
-                        Text("by ryyansafar · support ♥")
-                            .font(.system(size: 8))
-                            .foregroundColor(.gray.opacity(0.6))
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                WBar(label: "CPU", pct: e.cpu, color: barColor(e.cpu))
+                WBar(label: "MEM", pct: e.mem, color: barColor(e.mem))
+                Spacer(minLength: 0)
+                Text(e.date, style: .time).font(.system(size: 9)).foregroundColor(.gray)
             }
-            .padding(13)
+            .frame(maxWidth: .infinity)
+
+            Divider().background(Color.gray.opacity(0.3))
+
+            VStack(alignment: .leading, spacing: 8) {
+                InfoRow(label: "Thermal",  val: e.thermal,  color: dotColor(e.thermal))
+                InfoRow(label: "RAM used", val: e.memUsed,  color: .white)
+                InfoRow(label: "RAM total",val: e.memTotal, color: .gray)
+                InfoRow(label: "CPU load", val: "\(e.cpu)%",color: barColor(e.cpu))
+                Spacer(minLength: 0)
+                Link(destination: URL(string: "https://razorpay.me/@ryyansafar")!) {
+                    Text("by ryyansafar · support ♥")
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray.opacity(0.6))
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
+        .padding(13)
     }
 }
 
@@ -268,17 +264,28 @@ private func barColor(_ v: Int) -> Color {
     v >= 85 ? .red : v >= 60 ? .yellow : .green
 }
 
+/// The widget's background colour. Supplied through `containerBackground` rather than
+/// painted inside the views — see `widgetContainerBackground()`.
+private let widgetBackground = Color(red: 0.08, green: 0.08, blue: 0.12)
+
 private extension View {
-    /// `containerBackground(_:for:)` is macOS 14+, but the app supports macOS 13.
-    /// Desktop widgets only exist on 14 and later; on 13 the widget still works in
-    /// Notification Center, where the views supply their own background. Applying the
-    /// modifier where available keeps 14+ from rendering without a widget background.
+    /// Supplies the widget background via `containerBackground` on macOS 14+.
+    ///
+    /// This must not be an opaque `Color` inside the view hierarchy. macOS renders
+    /// desktop widgets through "content layers" and derives a tint mask from the
+    /// content, so a full-bleed opaque background makes the mask cover the entire
+    /// widget — which rendered as one solid tinted block instead of the stats.
+    /// `containerBackground` is understood by WidgetKit as chrome and excluded from
+    /// that mask, which is exactly why macOS 14 made it mandatory.
+    ///
+    /// On macOS 13 the modifier does not exist and desktop widgets do not either; the
+    /// widget appears in Notification Center, so paint the background directly there.
     @ViewBuilder
     func widgetContainerBackground() -> some View {
         if #available(macOS 14.0, *) {
-            containerBackground(.black, for: .widget)
+            containerBackground(widgetBackground, for: .widget)
         } else {
-            self
+            background(widgetBackground)
         }
     }
 }
