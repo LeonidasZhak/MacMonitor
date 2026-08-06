@@ -147,7 +147,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         // Comparing the full origin here closed the popover roughly once a second and
         // made the dashboard impossible to interact with.
         if let origin = anchorOrigin, abs(anchorWindow.frame.origin.y - origin.y) > 1 {
-            popover.performClose(nil)
+            dismissPopoverSoon()
             return
         }
 
@@ -155,7 +155,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         // checks for *no* intersection rather than full containment, so a status item
         // that is merely clipped by a crowded menu bar doesn't dismiss the popover.
         if let screen = anchorWindow.screen, !screen.frame.intersects(anchorWindow.frame) {
-            popover.performClose(nil)
+            dismissPopoverSoon()
+        }
+    }
+
+    /// Closes the popover on a later runloop pass rather than inline.
+    ///
+    /// Both triggers here are window-geometry notifications, which AppKit posts from
+    /// inside a CoreAnimation transaction. Tearing the popover down synchronously at
+    /// that point re-enters window animation teardown and can over-release
+    /// `_NSWindowTransformAnimation`, which showed up as an EXC_BAD_ACCESS in
+    /// `objc_release` under `CA::Context::commit_transaction`. Deferring lets the
+    /// current transaction finish before the popover goes away.
+    private func dismissPopoverSoon() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.popover.performClose(nil)
         }
     }
 
