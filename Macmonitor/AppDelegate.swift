@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 import ServiceManagement
+import WidgetKit
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
 
@@ -14,6 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     // Anchor tracking for the popover — see beginTrackingAnchor(_:).
     private var anchorObservers: [NSObjectProtocol] = []
     private var anchorOrigin: NSPoint?
+    private var outsideClickMonitor: Any?
+    private var lastWidgetReload = Date.distantPast
 
     // Subscribe to model changes so the label updates in sync with each tick,
     // not on a separate independent timer that may fire before data is ready.
@@ -42,6 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                 self?.lastMem = mem
                 self?.lastTemp = temp
                 self?.updateLabel(cpu: cpu, mem: mem, temp: temp)
+                self?.refreshWidgetsIfDue()
             }
             .store(in: &cancellables)
 
@@ -163,6 +167,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                 self?.closeIfAnchorInvalid(anchorWindow)
             }
         )
+
+        // Collapse when the user clicks anything outside the dashboard, the same way
+        // clicking the menu bar icon again collapses it.
+        //
+        // NSPopover.behavior = .transient is supposed to do this, but the app runs as
+        // .accessory: a click in another application is delivered to that application
+        // and never reaches us, so the popover just sits there. A global monitor sees
+        // those events. It deliberately does not fire for clicks inside our own
+        // windows — global monitors only observe events routed to other apps — so
+        // interacting with the dashboard itself won't dismiss it, and clicking the menu
+        // bar icon still goes through togglePopover.
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            self?.dismissPopoverSoon()
+        }
     }
 
     private func closeIfAnchorInvalid(_ anchorWindow: NSWindow) {
@@ -210,6 +230,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
         anchorObservers.removeAll()
         anchorOrigin = nil
+
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
+    }
+
+    // MARK: - Widget refresh
+
+    private static let widgetReloadInterval: TimeInterval = 30
+
+    /// Pushes a timeline reload to the desktop widget so it tracks the dashboard.
+    ///
+    /// The widget samples its own data, but left alone it only refreshes on the cadence
+    /// WidgetKit grants it — far slower than the app's sampling, and its timeline policy
+    /// is only a request, not a guarantee. While the app is running we can drive reloads
+    /// so the widget stays close to live.
+    ///
+    /// Throttled deliberately: WidgetKit budgets reloads per extension and starts
+    /// dropping them when one is too chatty, so reloading on every metrics tick would
+    /// make the widget update *less* often, not more.
+    private func refreshWidgetsIfDue() {
+        let now = Date()
+        guard now.timeIntervalSince(lastWidgetReload) >= Self.widgetReloadInterval else { return }
+        lastWidgetReload = now
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - NSPopoverDelegate

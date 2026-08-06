@@ -29,7 +29,11 @@ struct StatsProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatsEntry>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let entry = self.collect()
-            let next  = Calendar.current.date(byAdding: .second, value: 5, to: Date())!
+            // A timeline policy is a request, not a promise — WidgetKit budgets refreshes
+            // and will not honour a 5 second cadence, so asking for one only burned
+            // budget. Ask for something realistic here and let the app push reloads via
+            // WidgetCenter while it's running, which is what actually keeps this live.
+            let next = Date().addingTimeInterval(60)
             completion(Timeline(entries: [entry], policy: .after(next)))
         }
     }
@@ -236,6 +240,7 @@ struct WBar: View {
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(.white)
                 .frame(width: 28, alignment: .trailing)
+                .numericTransition()
         }
     }
 }
@@ -248,6 +253,7 @@ struct InfoRow: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label).font(.system(size: 9)).foregroundColor(.gray)
             Text(val).font(.system(size: 11, design: .monospaced)).foregroundColor(color)
+                .numericTransition()
         }
     }
 }
@@ -269,6 +275,20 @@ private func barColor(_ v: Int) -> Color {
 private let widgetBackground = Color(red: 0.08, green: 0.08, blue: 0.12)
 
 private extension View {
+    /// Rolls digits over when a reading changes instead of snapping.
+    ///
+    /// Widgets animate between timeline entries rather than on a live value, so a plain
+    /// `.animation` on text does nothing here — `contentTransition(.numericText())` is
+    /// what WidgetKit can actually interpolate across a reload. macOS 14+ only.
+    @ViewBuilder
+    func numericTransition() -> some View {
+        if #available(macOS 14.0, *) {
+            contentTransition(.numericText())
+        } else {
+            self
+        }
+    }
+
     /// Supplies the widget background via `containerBackground` on macOS 14+.
     ///
     /// This must not be an opaque `Color` inside the view hierarchy. macOS renders

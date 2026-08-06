@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import WidgetKit
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case automatic
@@ -444,8 +445,6 @@ private struct FooterBar: View {
 
 struct SettingsSheet: View {
     @Binding var isPresented: Bool
-    @AppStorage("enableMenuBar") var enableMenuBar = true
-    @AppStorage("enableWidget")  var enableWidget  = false
     @AppStorage("openAtLogin")   var openAtLogin   = false
     @AppStorage("cpuOnlyMenuBar") var cpuOnlyMenuBar = false
     @AppStorage("appTheme") private var appTheme = AppTheme.automatic.rawValue
@@ -455,14 +454,6 @@ struct SettingsSheet: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Settings")
                 .font(.system(size: 16, weight: .bold)).foregroundColor(.primary)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle("Menu Bar App", isOn: $enableMenuBar)
-                    .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                Text("Live stats in your menu bar. Click to open the full dashboard.")
-                    .font(.system(size: 11)).foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("CPU Percentage Only", isOn: $cpuOnlyMenuBar)
@@ -501,9 +492,17 @@ struct SettingsSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Toggle("Desktop Widget", isOn: $enableWidget)
-                    .toggleStyle(SwitchToggleStyle(tint: Color(hex: "30D158")))
-                Text("Right-click your desktop → Edit Widgets → find MacMonitor.")
+                HStack {
+                    Text("Desktop Widget")
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Button("Refresh Now") {
+                        WidgetCenter.shared.reloadAllTimelines()
+                    }
+                    .font(.system(size: 11))
+                }
+                Text("Right-click your desktop → Edit Widgets → find MacMonitor. "
+                     + "It refreshes on its own while MacMonitor is running.")
                     .font(.system(size: 11)).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
