@@ -418,8 +418,9 @@ class SystemStatsModel: ObservableObject {
             Self.logger.error("nettop failed status=\(result.status) stderr=\(result.stderr, privacy: .public)")
             return []
         }
-        return ProcessIORanking.networkRows(from: result.stdout)
+        let visibleRows = ProcessIORanking.networkRows(from: result.stdout, limit: .max)
             .filter { shouldShowProcess($0.name) }
+        return Array(visibleRows.prefix(5))
     }
 
     private func processName(pid: Int) -> String? {
