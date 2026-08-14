@@ -116,31 +116,53 @@ static BOOL restoreAutomatic(io_connect_t conn, int count) {
 
 static BOOL setMaximumCooling(io_connect_t conn, int count, NSMutableArray<NSNumber *> *targets) {
     BOOL usesLegacyMask = modeKey(conn, 0) == nil && keyExists(conn, "FS! ");
-    if (usesLegacyMask) {
-        unsigned int mask = (1u << count) - 1u;
-        if (SMCSetNumericValue(conn, "FS! ", mask) != kIOReturnSuccess) {
-            return NO;
-        }
-    } else {
-        for (int index = 0; index < count; index++) {
-            if (!enableManualMode(conn, index)) {
-                (void)restoreAutomatic(conn, count);
-                return NO;
-            }
-        }
-    }
+    NSMutableArray<NSString *> *targetKeys = [NSMutableArray arrayWithCapacity:count];
 
+    // Preflight every fan before changing any control mode. This avoids leaving
+    // a partially controlled system merely because a later fan lacks a target key.
     for (int index = 0; index < count; index++) {
         NSString *maximumKey = fanKey(index, @"Mx");
         NSString *targetKey = fanKey(index, @"Tg");
         double maximum = 0;
-        if (!readNumber(conn, maximumKey.UTF8String, &maximum) ||
-            maximum < 1000 || maximum > 20000 ||
-            !writeAndVerify(conn, targetKey, maximum)) {
-            (void)restoreAutomatic(conn, count);
+        if (!keyExists(conn, targetKey.UTF8String) ||
+            !readNumber(conn, maximumKey.UTF8String, &maximum) ||
+            maximum < 1000 || maximum > 20000) {
             return NO;
         }
+        [targetKeys addObject:targetKey];
         [targets addObject:@((int)llround(maximum))];
+    }
+
+    if (usesLegacyMask) {
+        // Legacy SMCs allow targets to be staged while automatic control remains
+        // active. Set every maximum first, then claim all fan bits atomically.
+        for (int index = 0; index < count; index++) {
+            if (SMCSetNumericValue(conn, targetKeys[index].UTF8String,
+                                   targets[index].doubleValue) != kIOReturnSuccess) {
+                return NO;
+            }
+        }
+        unsigned int mask = (1u << count) - 1u;
+        if (SMCSetNumericValue(conn, "FS! ", mask) != kIOReturnSuccess) {
+            return NO;
+        }
+        for (int index = 0; index < count; index++) {
+            if (!writeAndVerify(conn, targetKeys[index], targets[index].doubleValue)) {
+                (void)restoreAutomatic(conn, count);
+                return NO;
+            }
+        }
+    } else {
+        // Apple Silicon requires each mode byte before its target becomes writable.
+        // Complete one fan at a time so no later fan waits in manual mode without
+        // immediately receiving its validated maximum target.
+        for (int index = 0; index < count; index++) {
+            if (!enableManualMode(conn, index) ||
+                !writeAndVerify(conn, targetKeys[index], targets[index].doubleValue)) {
+                (void)restoreAutomatic(conn, count);
+                return NO;
+            }
+        }
     }
     return YES;
 }
